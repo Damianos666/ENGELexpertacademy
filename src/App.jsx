@@ -12,7 +12,7 @@ import { ScheduleTab } from "./components/ScheduleTab";
 import { MessagesTab } from "./components/MessagesTab";
 import { ProfileTab } from "./components/ProfileTab";
 import { TrainerScheduleTab } from "./components/TrainerScheduleTab";
-import { AdminPanel, AdminCodeGen } from "./components/AdminPanel";
+import { AdminPanel, AdminCodeGen, AdminQuiz } from "./components/AdminPanel";
 import { TabBar } from "./components/TabBar";
 
 // Stałe zdefiniowane poza komponentem — nowy obiekt nie powstaje przy każdym renderze
@@ -20,6 +20,7 @@ const TRAINER_TABS = [
   ["Terminarz", "📅"],
   ["Kody",       "🔑"],
   ["Wiadomości", "✉"],
+  ["Quiz",       "🎯"],
   ["Profil",     "⚙"],
 ];
 
@@ -299,7 +300,8 @@ function AppContent({
         {tab===0 && <TrainerScheduleTab token={user.accessToken} trainerNum={user.trainer_id}/>}
         {tab===1 && <AdminCodeGen defaultTrainer={user.trainer_id}/>}
         {tab===2 && <MessagesTab token={user.accessToken} userEmail={user.email} user={user}/>}
-        {tab===3 && <ProfileTab user={user} setUser={setUserRaw} completed={completed} activeGroups={activeGroups} setActiveGroups={setActiveGroups} onLogout={handleLogout} trainerView={trainerView} setTrainerView={setTrainerView}/>}
+        {tab===3 && <AdminQuiz token={user.accessToken}/>}
+        {tab===4 && <ProfileTab user={user} setUser={setUserRaw} completed={completed} activeGroups={activeGroups} setActiveGroups={setActiveGroups} onLogout={handleLogout} trainerView={trainerView} setTrainerView={setTrainerView}/>}
       </div>
       <div className="tabbar" style={{display:"flex",background:C.white,borderTop:`1px solid ${C.grey}`,flexShrink:0}}>
         {TRAINER_TABS.map(([label,icon],i) => (

@@ -1132,3 +1132,144 @@ export function AdminSchedule({ token }) {
     </div>
   );
 }
+/* ── Admin: Zarządzanie quizem ─────────────────────────────────────────── */
+export function AdminQuiz({ token }) {
+  const [questions, setQuestions] = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [showForm,  setShowForm]  = useState(false);
+  const [editing,   setEditing]   = useState(null);
+  const [deleting,  setDeleting]  = useState(null);
+  const [saving,    setSaving]    = useState(false);
+  const [err,       setErr]       = useState("");
+
+  // Formularz
+  const [fQ,   setFQ]   = useState("");
+  const [fA,   setFA]   = useState("");
+  const [fB,   setFB]   = useState("");
+  const [fC,   setFC]   = useState("");
+  const [fAns, setFAns] = useState("a");
+  const [fCat, setFCat] = useState("");
+
+  async function load() {
+    setLoading(true);
+    try {
+      const data = await db.get(token, "quiz_questions", "order=category.asc,created_at.asc&select=*");
+      setQuestions(data);
+    } catch(e) { setErr("Błąd: " + e.message); }
+    finally { setLoading(false); }
+  }
+  useEffect(() => { load(); }, []);
+
+  function openNew() {
+    setEditing(null); setFQ(""); setFA(""); setFB(""); setFC(""); setFAns("a"); setFCat("");
+    setShowForm(true); setErr("");
+  }
+  function openEdit(q) {
+    setEditing(q);
+    setFQ(q.question); setFA(q.answer_a); setFB(q.answer_b); setFC(q.answer_c);
+    setFAns(q.correct); setFCat(q.category || "");
+    setShowForm(true); setErr("");
+  }
+
+  async function save() {
+    if (!fQ.trim()||!fA.trim()||!fB.trim()||!fC.trim()) { setErr("Wypełnij wszystkie pola."); return; }
+    setSaving(true); setErr("");
+    const payload = { question:fQ.trim(), answer_a:fA.trim(), answer_b:fB.trim(), answer_c:fC.trim(), correct:fAns, category:fCat.trim()||"ogólne" };
+    try {
+      if (editing) await db.update(token, "quiz_questions", `id=eq.${editing.id}`, payload);
+      else         await db.insert(token, "quiz_questions", payload);
+      setShowForm(false); await load();
+    } catch(e) { setErr("Błąd zapisu: " + e.message); }
+    finally { setSaving(false); }
+  }
+
+  async function del(id) {
+    setDeleting(id);
+    try { await db.remove(token, "quiz_questions", `id=eq.${id}`); setQuestions(p=>p.filter(q=>q.id!==id)); }
+    catch(e) { alert("Błąd: " + e.message); }
+    finally { setDeleting(null); }
+  }
+
+  const inpStyle = { width:"100%", boxSizing:"border-box", border:`1px solid ${C.grey}`, padding:"9px 12px", fontSize:13, marginBottom:10, borderRadius:4 };
+  const catColors = {};
+  questions.forEach(q => { if (!catColors[q.category]) catColors[q.category] = `hsl(${Object.keys(catColors).length * 67},60%,40%)`; });
+
+  return (
+    <div style={{padding:12,display:"flex",flexDirection:"column",gap:12}}>
+      {err && <div style={{background:"#FDEDEC",border:`1px solid ${C.red}`,padding:"10px 14px",fontSize:13,color:C.red,borderRadius:4}}>{err}</div>}
+
+      <button onClick={openNew} style={{background:C.green,border:"none",color:C.white,padding:"11px",fontSize:13,fontWeight:700,cursor:"pointer",borderRadius:6}}>
+        + Dodaj pytanie
+      </button>
+
+      {/* Formularz */}
+      {showForm && (
+        <div style={{background:C.white,padding:16,borderRadius:8,boxShadow:"0 2px 8px rgba(0,0,0,.1)"}}>
+          <div style={{fontSize:13,fontWeight:700,marginBottom:12}}>{editing?"Edytuj pytanie":"Nowe pytanie"}</div>
+          <textarea value={fQ} onChange={e=>setFQ(e.target.value)} placeholder="Treść pytania" rows={3}
+            style={{...inpStyle,resize:"vertical",fontFamily:"inherit"}}/>
+          {["a","b","c"].map(k => (
+            <div key={k} style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+              <button onClick={()=>setFAns(k)} style={{
+                width:28,height:28,borderRadius:"50%",border:"none",flexShrink:0,cursor:"pointer",fontWeight:700,fontSize:12,
+                background:fAns===k?C.green:"#eee", color:fAns===k?C.white:C.greyMid
+              }}>{k.toUpperCase()}</button>
+              <input value={k==="a"?fA:k==="b"?fB:fC}
+                onChange={e=>(k==="a"?setFA:k==="b"?setFB:setFC)(e.target.value)}
+                placeholder={`Odpowiedź ${k.toUpperCase()}`}
+                style={{...inpStyle,marginBottom:0,flex:1,border:`1px solid ${fAns===k?C.green:C.grey}`}}/>
+            </div>
+          ))}
+          <div style={{fontSize:11,color:C.greyMid,marginBottom:4}}>Kliknij literę aby zaznaczyć poprawną odpowiedź</div>
+          <input value={fCat} onChange={e=>setFCat(e.target.value)} placeholder="Kategoria (np. MO-L1, Bezpieczeństwo...)"
+            style={inpStyle}/>
+          {err && <div style={{color:C.red,fontSize:12,marginBottom:8}}>{err}</div>}
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={save} disabled={saving}
+              style={{flex:1,background:C.black,border:"none",color:C.white,padding:11,fontSize:13,fontWeight:700,cursor:"pointer",borderRadius:4}}>
+              {saving?"Zapisuję...":"Zapisz"}
+            </button>
+            <button onClick={()=>setShowForm(false)}
+              style={{flex:1,background:"none",border:`1px solid ${C.grey}`,color:C.greyDk,padding:11,fontSize:13,cursor:"pointer",borderRadius:4}}>
+              Anuluj
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Lista pytań */}
+      {loading && <div style={{textAlign:"center",color:C.greyMid,padding:24}}><Spinner/></div>}
+      {!loading && !questions.length && (
+        <div style={{textAlign:"center",color:C.greyMid,padding:32,fontSize:13}}>Brak pytań. Dodaj pierwsze pytanie.</div>
+      )}
+      {questions.map((q,i) => (
+        <div key={q.id} style={{background:C.white,borderRadius:8,padding:"12px 14px",boxShadow:"0 1px 3px rgba(0,0,0,.06)"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:6}}>
+            <span style={{fontSize:9,fontWeight:700,color:catColors[q.category]||C.greyMid,background:`${catColors[q.category]||C.grey}18`,padding:"2px 7px",borderRadius:3,flexShrink:0}}>
+              {q.category||"ogólne"}
+            </span>
+            <div style={{display:"flex",gap:6}}>
+              <button onClick={()=>openEdit(q)} style={{background:"none",border:`1px solid ${C.grey}`,padding:"3px 8px",fontSize:11,cursor:"pointer",borderRadius:3}}>✏️</button>
+              <button onClick={()=>del(q.id)} disabled={deleting===q.id}
+                style={{background:"none",border:`1px solid ${C.red}`,padding:"3px 8px",fontSize:11,cursor:"pointer",borderRadius:3,color:C.red}}>
+                {deleting===q.id?"...":"🗑"}
+              </button>
+            </div>
+          </div>
+          <div style={{fontSize:13,fontWeight:600,color:C.black,marginBottom:8,lineHeight:1.4}}>{i+1}. {q.question}</div>
+          {["a","b","c"].map(k => (
+            <div key={k} style={{
+              fontSize:12, padding:"4px 8px", marginBottom:3, borderRadius:4,
+              background: k===q.correct?"#EAFAF1":C.greyBg,
+              color: k===q.correct?"#1a7a40":C.greyDk,
+              fontWeight: k===q.correct?700:400,
+              border: k===q.correct?`1px solid ${C.green}`:"none",
+            }}>
+              {k.toUpperCase()}. {q[`answer_${k}`]} {k===q.correct&&"✓"}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
