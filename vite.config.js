@@ -30,6 +30,8 @@ export default defineConfig(({ mode }) => {
           ],
         },
         workbox: {
+          skipWaiting: true,      // nowy SW nie czeka — od razu przejmuje kontrolę
+          clientsClaim: true,     // przejmuje wszystkie otwarte zakładki natychmiast
           globPatterns: ['**/*.{js,css,html,png,svg,ico}'],
           maximumFileSizeToCacheInBytes: 4 * 1024 * 1024, // 4 MB
           runtimeCaching: [
