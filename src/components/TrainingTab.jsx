@@ -80,6 +80,8 @@ export function TrainingTab({ user, completed, onComplete, activeGroups, loading
     };
     onComplete(entry);
     setCelebEntry(entry);
+    // Haptic feedback — wzorzec: krótki puls · pauza · mocniejszy akcent · pauza · finał
+    if (navigator.vibrate) navigator.vibrate([60, 80, 120, 60, 200]);
     setCode("");
     setStatus(null);
     setConfirm(null);
