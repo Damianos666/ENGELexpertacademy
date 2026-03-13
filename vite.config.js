@@ -1,0 +1,60 @@
+import { defineConfig, loadEnv } from 'vite'
+import react from '@vitejs/plugin-react'
+import { VitePWA } from 'vite-plugin-pwa'
+
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+  const supabaseHost = env.VITE_SUPABASE_URL
+    ? new URL(env.VITE_SUPABASE_URL).hostname
+    : 'localhost'
+
+  return {
+    plugins: [
+      react(),
+      VitePWA({
+        registerType: 'autoUpdate',
+        includeAssets: ['logo.png', 'pwa-192.png', 'pwa-512.png'],
+        manifest: {
+          name: 'ENGEL expert academy',
+          short_name: 'ENGEL EA',
+          description: 'Aplikacja szkoleń ENGEL Expert Academy',
+          theme_color: '#2C2C2C',
+          background_color: '#EFEFEF',
+          display: 'standalone',
+          orientation: 'portrait',
+          scope: '/',
+          start_url: '/',
+          icons: [
+            { src: 'pwa-192.png', sizes: '192x192', type: 'image/png' },
+            { src: 'pwa-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+          ],
+        },
+        workbox: {
+          globPatterns: ['**/*.{js,css,html,png,svg,ico}'],
+          maximumFileSizeToCacheInBytes: 4 * 1024 * 1024, // 4 MB
+          runtimeCaching: [
+            {
+              // Tylko /rest/v1/ — auth jest celowo wykluczone żeby nie psuć CORS preflight
+              urlPattern: new RegExp(`^https://${supabaseHost}/rest/v1/.*`, 'i'),
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: 'supabase-api',
+                expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 },
+              },
+            },
+          ],
+        },
+      }),
+    ],
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'react-pdf': ['@react-pdf/renderer'],
+            'react-vendor': ['react', 'react-dom'],
+          },
+        },
+      },
+    },
+  }
+})
