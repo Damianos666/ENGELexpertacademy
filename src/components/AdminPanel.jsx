@@ -851,15 +851,11 @@ export function AdminSchedule({ token }) {
         <span style={{fontSize:8,fontWeight:700,color:"#fff",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",flex:1}}>
           {bar.title}{bar.isPlanned?" ···":""}
         </span>
-        {badgeVal !== null ? (
+        {badgeVal !== null && (
           <span style={{flexShrink:0,background:"rgba(0,0,0,.35)",borderRadius:"50%",width:12,height:12,display:"flex",alignItems:"center",justifyContent:"center",fontSize:7,color:"#fff",lineHeight:"12px",fontWeight:700}}>
             {badgeVal > 99 ? "99+" : badgeVal}
           </span>
-        ) : bar.trainerId ? (
-          <span style={{flexShrink:0,background:"rgba(0,0,0,.35)",borderRadius:"50%",width:12,height:12,display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,color:"#fff",lineHeight:"12px",fontWeight:700}}>
-            {bar.trainerId}
-          </span>
-        ) : null}
+        )}
       </div>
     );
   }

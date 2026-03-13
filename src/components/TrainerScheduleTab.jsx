@@ -59,7 +59,6 @@ export function TrainerScheduleTab({ token, trainerNum }) {
   });
 
   const timelineRef         = useRef(null);
-  const pressTimers         = useRef({});
   const pendingScrollAdjust = useRef(0);  // korekta scrollLeft po dodaniu miesiąca z lewej
   const initialScrollDone   = useRef(false);
   const isExtending         = useRef(false); // blokuje wielokrotne wywołania podczas jednego scrollu
@@ -167,26 +166,18 @@ export function TrainerScheduleTab({ token, trainerNum }) {
     }
   }
 
-  // Long-press → modal z notatkami
-  function handlePressStart(entry, e) {
-    if (e.type === "touchstart") e.preventDefault();
-    pressTimers.current[entry.id] = setTimeout(() => {
-      delete pressTimers.current[entry.id];
-      const isST = entry.training_id === "ST";
-      const t    = isST ? null : TRAININGS.find(x => x.id === entry.training_id);
-      setNotesModal({
-        title:        isST ? (entry.custom_name || "ST") : (t?.title || entry.training_id),
-        notes:        entry.notes || "",
-        participants: entry.participants_count,
-        date:         entry.date,
-        endDate:      entry.end_date,
-        trainer:      entry.trainer_id,
-      });
-    }, 650);
-  }
-
-  function handlePressEnd(id) {
-    if (pressTimers.current[id]) { clearTimeout(pressTimers.current[id]); delete pressTimers.current[id]; }
+  // Tap → modal z notatkami
+  function handleTap(entry) {
+    const isST = entry.training_id === "ST";
+    const t    = isST ? null : TRAININGS.find(x => x.id === entry.training_id);
+    setNotesModal({
+      title:        isST ? (entry.custom_name || "ST") : (t?.title || entry.training_id),
+      notes:        entry.notes || "",
+      participants: entry.participants_count,
+      date:         entry.date,
+      endDate:      entry.end_date,
+      trainer:      entry.trainer_id,
+    });
   }
 
   const trainersToShow = activeTrainers.length > 0 ? activeTrainers : ALL_TRAINERS;
@@ -298,22 +289,15 @@ export function TrainerScheduleTab({ token, trainerNum }) {
                     {/* Paski szkoleń */}
                     {(trainerBars[trainerId]||[]).map((bar,bi)=>(
                       <div key={bi}
-                        onMouseDown={e=>handlePressStart(bar.entry,e)}
-                        onMouseUp={()=>handlePressEnd(bar.id)}
-                        onMouseLeave={()=>handlePressEnd(bar.id)}
-                        onTouchStart={e=>handlePressStart(bar.entry,e)}
-                        onTouchEnd={()=>handlePressEnd(bar.id)}
-                        onTouchMove={()=>handlePressEnd(bar.id)}
+                        onClick={()=>handleTap(bar.entry)}
                         onContextMenu={e=>e.preventDefault()}
                         title="Przytrzymaj → notatki"
                         style={{position:"absolute",left:bar.left,top:4,height:22,width:bar.width,zIndex:2,background:bar.color,borderRadius:3,display:"flex",alignItems:"center",padding:"0 3px",gap:2,cursor:"pointer",overflow:"hidden",boxSizing:"border-box",opacity:bar.isPlanned?0.75:1,border:bar.isHidden?"1px solid rgba(0,0,0,.35)":"none"}}>
                         {bar.isHidden&&<span style={{flexShrink:0,fontSize:7,color:"rgba(255,255,255,.85)"}}>🔒</span>}
                         {bar.isOutgoing&&!bar.isHidden&&<span style={{flexShrink:0,fontSize:7,color:"rgba(255,255,255,.85)"}}>✈️</span>}
                         <span style={{fontSize:8,fontWeight:700,color:"#fff",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",flex:1}}>{bar.title}{bar.isPlanned?" ···":""}</span>
-                        {bar.participantsCount!=null ? (
+                        {bar.participantsCount!=null && (
                           <span style={{flexShrink:0,background:"rgba(0,0,0,.35)",borderRadius:"50%",width:12,height:12,display:"flex",alignItems:"center",justifyContent:"center",fontSize:7,color:"#fff",lineHeight:"12px",fontWeight:700}}>{bar.participantsCount>99?"99+":bar.participantsCount}</span>
-                        ) : (
-                          <span style={{flexShrink:0,background:"rgba(0,0,0,.35)",borderRadius:"50%",width:12,height:12,display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,color:"#fff",lineHeight:"12px",fontWeight:700}}>{bar.entry.trainer_id}</span>
                         )}
                       </div>
                     ))}
@@ -355,12 +339,7 @@ export function TrainerScheduleTab({ token, trainerNum }) {
             const isPlanned = (s.status||"active")==="planned";
             return (
               <div key={s.id}
-                onMouseDown={e=>handlePressStart(s,e)}
-                onMouseUp={()=>handlePressEnd(s.id)}
-                onMouseLeave={()=>handlePressEnd(s.id)}
-                onTouchStart={e=>handlePressStart(s,e)}
-                onTouchEnd={()=>handlePressEnd(s.id)}
-                onTouchMove={()=>handlePressEnd(s.id)}
+                onClick={()=>handleTap(s)}
                 onContextMenu={e=>e.preventDefault()}
                 style={{display:"flex",alignItems:"center",gap:10,padding:"10px 0",borderBottom:`1px solid ${C.grey}`,opacity:isPlanned?0.6:1,cursor:"pointer"}}>
                 <div style={{width:4,alignSelf:"stretch",background:isPlanned?"#BBBBBB":barColor,borderRadius:2,flexShrink:0}}/>
