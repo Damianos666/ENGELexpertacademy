@@ -90,35 +90,36 @@ export function ProfileTab({ user, setUser, completed, activeGroups, setActiveGr
 
       <div style={{padding:"8px 12px 40px",display:"flex",flexDirection:"column",gap:8}}>
         <div style={{background:C.white}}>
-          <SecTitle>{T.training_groups}</SecTitle>
-          {GROUPS.map(g => {
-            const active = activeGroups.includes(g.id);
-            const gT = TRAININGS.filter(t => t.group===g.id);
-            const gD = completed.filter(c => gT.some(t => t.id===c.training.id)).length;
-            return (
-              <div key={g.id} style={{padding:"13px 18px",borderBottom:`1px solid ${C.grey}`,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                <div style={{flex:1}}>
-                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:3}}>
-                    <span style={{width:10,height:10,borderRadius:"50%",background:active?g.color:C.grey,flexShrink:0,display:"inline-block"}}/>
-                    <span style={{fontSize:14,fontWeight:active?700:400,color:active?C.black:C.greyMid}}>{g.label}</span>
+          {trainerView !== "trainer" && <>
+            <SecTitle>{T.training_groups}</SecTitle>
+            {GROUPS.map(g => {
+              const active = activeGroups.includes(g.id);
+              const gT = TRAININGS.filter(t => t.group===g.id);
+              const gD = completed.filter(c => gT.some(t => t.id===c.training.id)).length;
+              return (
+                <div key={g.id} style={{padding:"13px 18px",borderBottom:`1px solid ${C.grey}`,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                  <div style={{flex:1}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:3}}>
+                      <span style={{width:10,height:10,borderRadius:"50%",background:active?g.color:C.grey,flexShrink:0,display:"inline-block"}}/>
+                      <span style={{fontSize:14,fontWeight:active?700:400,color:active?C.black:C.greyMid}}>{g.label}</span>
+                    </div>
+                    <div style={{fontSize:11,color:C.greyMid,paddingLeft:20}}>{gT.length} szkoleń{active?` · ${gD} ${T.completed_word}`:""}</div>
                   </div>
-                  <div style={{fontSize:11,color:C.greyMid,paddingLeft:20}}>{gT.length} szkoleń{active?` · ${gD} ${T.completed_word}`:""}</div>
+                  <Toggle value={active} color={g.color} onChange={() => toggleGroup(g.id)}/>
                 </div>
-                <Toggle value={active} color={g.color} onChange={() => toggleGroup(g.id)}/>
+              );
+            })}
+            {activeGroups.length > 0 && (
+              <div style={{padding:"12px 18px",background:C.greyBg,borderTop:`1px solid ${C.grey}`}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                  <span style={{fontSize:12,color:C.greyDk}}>Łączny postęp</span>
+                  <span style={{fontSize:16,fontWeight:700,color:C.green}}>{progress.pct}%</span>
+                </div>
+                <div style={{height:4,background:C.grey}}><div style={{height:"100%",background:C.green,width:`${progress.pct}%`,transition:"width .5s"}}/></div>
+                <div style={{fontSize:11,color:C.greyMid,marginTop:4}}>{progress.done} / {progress.total} szkoleń zaliczonych</div>
               </div>
-            );
-          })}
-          {activeGroups.length > 0 && (
-            <div style={{padding:"12px 18px",background:C.greyBg,borderTop:`1px solid ${C.grey}`}}>
-              <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-                <span style={{fontSize:12,color:C.greyDk}}>Łączny postęp</span>
-                <span style={{fontSize:16,fontWeight:700,color:C.green}}>{progress.pct}%</span>
-              </div>
-              <div style={{height:4,background:C.grey}}><div style={{height:"100%",background:C.green,width:`${progress.pct}%`,transition:"width .5s"}}/></div>
-              <div style={{fontSize:11,color:C.greyMid,marginTop:4}}>{progress.done} / {progress.total} szkoleń zaliczonych</div>
-            </div>
-          )}
-
+            )}
+          </>}
           {/* Panel Klienta toggle — tylko dla kont trenerów */}
           {user.trainer_id != null && trainerView !== undefined && (
             <div style={{padding:"13px 18px",borderTop:`1px solid ${C.grey}`,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
