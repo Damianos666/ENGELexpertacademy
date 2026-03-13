@@ -4,9 +4,9 @@ import { db } from "../lib/supabase";
 
 /* ─── Stałe ─────────────────────────────────────────────────────────────── */
 const LEVELS = [
-  { id: "amator",  label: "Amator",  time: 5,  base: 50, color: "#27AE60" },
-  { id: "pro",     label: "PRO",     time: 10, base: 100, color: "#E67E22" },
-  { id: "ekspert", label: "EKSPERT", time: 15, base: 150, color: "#E74C3C" },
+  { id: "amator",  label: "Amator",  time: 15, base: 100, color: "#27AE60" },
+  { id: "pro",     label: "PRO",     time: 10, base: 150, color: "#E67E22" },
+  { id: "ekspert", label: "EKSPERT", time: 5,  base: 200, color: "#E74C3C" },
 ];
 
 /* ─── Odliczanie 3-2-1 ───────────────────────────────────────────────────── */
