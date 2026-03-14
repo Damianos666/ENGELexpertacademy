@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { writeFileSync } from 'fs'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
@@ -8,7 +9,14 @@ export default defineConfig(({ mode }) => {
     ? new URL(env.VITE_SUPABASE_URL).hostname
     : 'localhost'
 
+  // Generuj version.json przy każdym buildzie
+  const buildTime = Date.now().toString();
+  try { writeFileSync('public/version.json', JSON.stringify({ v: buildTime })); } catch(e) {}
+
   return {
+    define: {
+      __BUILD_TIME__: JSON.stringify(buildTime),
+    },
     plugins: [
       react(),
       VitePWA({
@@ -30,10 +38,11 @@ export default defineConfig(({ mode }) => {
           ],
         },
         workbox: {
-          skipWaiting: true,      // nowy SW nie czeka — od razu przejmuje kontrolę
-          clientsClaim: true,     // przejmuje wszystkie otwarte zakładki natychmiast
+          skipWaiting: true,
+          clientsClaim: true,
           globPatterns: ['**/*.{js,css,html,png,svg,ico}'],
-          maximumFileSizeToCacheInBytes: 4 * 1024 * 1024, // 4 MB
+          globIgnores: ['version.json'],
+          maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
           runtimeCaching: [
             {
               // Tylko /rest/v1/ — auth jest celowo wykluczone żeby nie psuć CORS preflight
