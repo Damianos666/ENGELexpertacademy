@@ -709,7 +709,7 @@ export function AdminSchedule({ token }) {
         notes: notes.trim(),
       };
       await db.insert(token, "scheduled_trainings", payload);
-      setMsg({ok:true,text:"✓ Dodano szkolenie do planerza!"});
+      setMsg({ok:true,text:"✓ Dodano szkolenie do planu!"});
       closeForm(); await loadScheduled();
     } catch(e) { setMsg({ok:false,text:"Błąd zapisu: "+e.message}); }
     setSaving(false);
@@ -1050,7 +1050,7 @@ export function AdminSchedule({ token }) {
           {formMode === "new" ? (
             <button onClick={addEntry} disabled={saving}
               style={{width:"100%",background:saving?C.greyDk:C.black,color:C.white,border:"none",padding:14,fontSize:13,fontWeight:700,borderRadius:6,cursor:saving?"not-allowed":"pointer"}}>
-              {saving ? "Zapisywanie…" : "✓ Dodaj do planerza"}
+              {saving ? "Zapisywanie…" : "✓ Dodaj do planu"}
             </button>
           ) : (
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
