@@ -1353,10 +1353,6 @@ export function AdminQuiz({ token }) {
               {qz.questionCount} {qz.questionCount===1?"pytanie":qz.questionCount>=2&&qz.questionCount<=4?"pytania":"pytań"}
             </div>
           </div>
-          <button onClick={() => openQuiz(qz)}
-            style={{background:C.greyBg,border:`1px solid ${C.grey}`,padding:"6px 12px",fontSize:11,fontWeight:700,cursor:"pointer",borderRadius:4,flexShrink:0}}>
-            Edytuj →
-          </button>
         </div>
       ))}
     </div>
