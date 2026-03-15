@@ -5,14 +5,29 @@ import { db } from "../lib/supabase";
 import { useT } from "../lib/LangContext";
 import { useUser } from "../lib/UserContext";
 
-
+// ── Święta publiczne (PL) ─────────────────────────────────────────────────
+// Pobierane raz na rok z date.nager.at — bezpłatne API, bez klucza.
+// Cache w localStorage — żadnego pollingu, święta się nie zmieniają.
+async function fetchHolidaysForYear(year) {
+  const key = `eea_holidays_PL_${year}`;
+  try {
+    const cached = localStorage.getItem(key);
+    if (cached) return JSON.parse(cached);
+    const res = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/PL`);
+    if (!res.ok) return {};
+    const data = await res.json();
+    const map = {};
+    data.forEach(h => { map[h.date] = h.localName; });
+    localStorage.setItem(key, JSON.stringify(map));
+    return map;
+  } catch { return {}; }
+}
 
 function toISO(date) {
   return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
 }
 function today() { return toISO(new Date()); }
 
-// Generuje i pobiera plik .ics dla jednego szkolenia (obsługuje też ST)
 function downloadICS(s, t) {
   const isST   = s.training_id === "ST";
   const title  = isST ? (s.custom_name || "Szkolenie specjalne") : t.title;
@@ -26,18 +41,11 @@ function downloadICS(s, t) {
   const now  = new Date().toISOString().replace(/[-:.]/g,"").slice(0,15) + "Z";
   const uid  = `${s.id}-${dateStart}@engel-academy`;
   const ics  = [
-    "BEGIN:VCALENDAR",
-    "VERSION:2.0",
-    "PRODID:-//ENGEL Expert Academy//PL",
-    "BEGIN:VEVENT",
-    `UID:${uid}`,
-    `DTSTAMP:${now}`,
+    "BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//ENGEL Expert Academy//PL",
+    "BEGIN:VEVENT",`UID:${uid}`,`DTSTAMP:${now}`,
     isMultiDay ? `DTSTART;VALUE=DATE:${dateStart}` : `DTSTART;TZID=Europe/Warsaw:${dateStart}T083000`,
     isMultiDay ? `DTEND;VALUE=DATE:${dateEnd}`      : `DTEND;TZID=Europe/Warsaw:${dateStart}T160000`,
-    `SUMMARY:${title}`,
-    "DESCRIPTION:ENGEL Expert Academy",
-    "END:VEVENT",
-    "END:VCALENDAR"
+    `SUMMARY:${title}`,"DESCRIPTION:ENGEL Expert Academy","END:VEVENT","END:VCALENDAR"
   ].join("\r\n");
   const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
   const url  = URL.createObjectURL(blob);
@@ -46,29 +54,25 @@ function downloadICS(s, t) {
   URL.revokeObjectURL(url);
 }
 
-
 export function ScheduleTab({ activeGroups }) {
   const { token } = useUser();
   const T = useT();
   const [scheduled, setScheduled]   = useState([]);
   const [loading,   setLoading]     = useState(true);
-  const [selected,  setSelected]    = useState(null);   // "YYYY-MM-DD" or null
+  const [selected,  setSelected]    = useState(null);
   const [viewYear,  setViewYear]    = useState(new Date().getFullYear());
-  const [viewMonth, setViewMonth]   = useState(new Date().getMonth());  // 0-11
+  const [viewMonth, setViewMonth]   = useState(new Date().getMonth());
+  const [holidays,  setHolidays]    = useState({});
 
-  // ── Pobierz harmonogram z bazy ──────────────────────────────────────────
   useEffect(() => {
     async function load() {
       setLoading(true);
       try {
         const data = await db.get(token, "scheduled_trainings", "order=date.asc");
         const all = Array.isArray(data) ? data : [];
-        // Pokazuj tylko przyszłe, aktywne i nieskryte szkolenia
         const todayStr = toISO(new Date());
         setScheduled(all.filter(s =>
-          (s.end_date || s.date) >= todayStr &&
-          !s.is_hidden &&
-          !s.is_outgoing
+          (s.end_date || s.date) >= todayStr && !s.is_hidden && !s.is_outgoing
         ));
       } catch { setScheduled([]); }
       finally { setLoading(false); }
@@ -76,13 +80,30 @@ export function ScheduleTab({ activeGroups }) {
     load();
   }, [token]);
 
-  // ── Filtruj wg aktywnych grup ────────────────────────────────────────────
+  // Pobierz święta dla bieżącego i następnego roku przy starcie
+  useEffect(() => {
+    const thisYear = new Date().getFullYear();
+    Promise.all([
+      fetchHolidaysForYear(thisYear),
+      fetchHolidaysForYear(thisYear + 1),
+    ]).then(([a, b]) => setHolidays({ ...a, ...b }));
+  }, []);
+
+  // Jeśli użytkownik nawiguje do roku spoza cache — pobierz go
+  useEffect(() => {
+    const key = `eea_holidays_PL_${viewYear}`;
+    if (!localStorage.getItem(key)) {
+      fetchHolidaysForYear(viewYear).then(map =>
+        setHolidays(prev => ({ ...prev, ...map }))
+      );
+    }
+  }, [viewYear]);
+
   const visible = useMemo(() => scheduled.filter(s => {
     const t = TRAININGS.find(t => t.id === s.training_id);
     return (s.training_id === "ST") ? true : (t && activeGroups.includes(t.group));
   }), [scheduled, activeGroups]);
 
-  // ── Zestaw dat z szkoleniami (tylko widoczne) ───────────────────────────
   const datesWithTrainings = useMemo(() => {
     const map = {};
     visible.forEach(s => {
@@ -97,21 +118,16 @@ export function ScheduleTab({ activeGroups }) {
     return map;
   }, [visible]);
 
-  // ── Szkolenia do wyświetlenia (wybrana data LUB 3 najbliższe) ──────────
   const displayItems = useMemo(() => {
     const now = today();
-    if (selected) {
-      return visible.filter(s => s.date === selected);
-    }
-    // 3 najbliższe od dziś
+    if (selected) return visible.filter(s => s.date === selected);
     return visible.filter(s => s.date >= now).slice(0, 3);
   }, [visible, selected]);
 
-  // ── Kalendarz: oblicz dni ───────────────────────────────────────────────
   const calendarDays = useMemo(() => {
     const firstDay = new Date(viewYear, viewMonth, 1);
-    let startDow = firstDay.getDay(); // 0=Sun
-    startDow = startDow === 0 ? 6 : startDow - 1; // Pn=0
+    let startDow = firstDay.getDay();
+    startDow = startDow === 0 ? 6 : startDow - 1;
     const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
     const cells = [];
     for (let i = 0; i < startDow; i++) cells.push(null);
@@ -133,10 +149,8 @@ export function ScheduleTab({ activeGroups }) {
   return (
     <div style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch",background:C.greyBg,display:"flex",flexDirection:"column"}}>
 
-      {/* ── KALENDARZ ── */}
       <div style={{background:C.white,margin:"12px 12px 0",borderRadius:8,boxShadow:"0 1px 3px rgba(0,0,0,.07)",padding:"12px 10px"}}>
 
-        {/* Nawigacja miesiąca */}
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
           <button onClick={prevMonth} style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:C.greyDk,padding:"4px 8px"}}>‹</button>
           <span style={{fontSize:14,fontWeight:700,color:C.black,letterSpacing:.3}}>
@@ -145,35 +159,45 @@ export function ScheduleTab({ activeGroups }) {
           <button onClick={nextMonth} style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:C.greyDk,padding:"4px 8px"}}>›</button>
         </div>
 
-        {/* Nagłówki dni */}
         <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",marginBottom:4}}>
-          {T.days_short.map(d => (
-            <div key={d} style={{textAlign:"center",fontSize:9,fontWeight:700,color:C.greyMid,padding:"2px 0",letterSpacing:.5}}>{d}</div>
+          {T.days_short.map((d, i) => (
+            <div key={d} style={{textAlign:"center",fontSize:9,fontWeight:700,color: i >= 5 ? "#E74C3C" : C.greyMid,padding:"2px 0",letterSpacing:.5}}>{d}</div>
           ))}
         </div>
 
-        {/* Komórki */}
         <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2}}>
           {calendarDays.map((day, i) => {
             if (!day) return <div key={`e${i}`}/>;
             const iso = `${viewYear}-${String(viewMonth+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
-            const groups = datesWithTrainings[iso] || [];
-            const isToday = iso === todayStr;
-            const isSel   = iso === selected;
+            const groups    = datesWithTrainings[iso] || [];
+            const isToday   = iso === todayStr;
+            const isSel     = iso === selected;
+            const dow       = new Date(iso + "T00:00:00").getDay();
+            const isWeekend = dow === 0 || dow === 6;
+            const isHoliday = !!holidays[iso];
+            const isDayOff  = isWeekend || isHoliday;
+
+            let bg = "transparent";
+            if (isSel)         bg = C.black;
+            else if (isToday)  bg = C.greenBg;
+            else if (isDayOff) bg = "#FFF0EE";
+
+            const numColor = isSel ? C.white : isToday ? C.greenDk : isDayOff ? "#E74C3C" : C.greyDk;
+
             return (
               <button key={iso} onClick={() => setSelected(isSel ? null : iso)}
+                title={holidays[iso] || undefined}
                 style={{
-                  background: isSel ? C.black : isToday ? C.greenBg : "transparent",
-                  border: isToday && !isSel ? `1px solid ${C.green}` : "1px solid transparent",
+                  background: bg,
+                  border: isToday && !isSel ? `1px solid ${C.green}` : isDayOff && !isSel ? "1px solid #FADBD8" : "1px solid transparent",
                   borderRadius: 6,
                   padding: "5px 2px 3px",
                   cursor: groups.length ? "pointer" : "default",
                   display:"flex", flexDirection:"column", alignItems:"stretch", gap:2,
                 }}>
-                <span style={{fontSize:12,fontWeight: isToday||isSel ? 700 : 400,color: isSel ? C.white : isToday ? C.greenDk : C.greyDk, textAlign:"center"}}>
+                <span style={{fontSize:12,fontWeight: isToday||isSel||isHoliday ? 700 : 400, color: numColor, textAlign:"center"}}>
                   {day}
                 </span>
-                {/* Kolorowe kropki — wyśrodkowane, obok siebie */}
                 {groups.length > 0 && (() => {
                   const uniq = [...new Set(groups)].slice(0,3);
                   return (
@@ -190,7 +214,6 @@ export function ScheduleTab({ activeGroups }) {
           })}
         </div>
 
-        {/* Legenda */}
         <div style={{display:"flex",justifyContent:"center",gap:12,marginTop:10,paddingTop:8,borderTop:`1px solid ${C.grey}`,flexWrap:"wrap"}}>
           {GROUPS.filter(g => activeGroups.includes(g.id)).map(g => (
             <div key={g.id} style={{display:"flex",alignItems:"center",gap:4}}>
@@ -202,18 +225,24 @@ export function ScheduleTab({ activeGroups }) {
             <div style={{width:8,height:8,borderRadius:"50%",background:"#8E44AD"}}/>
             <span style={{fontSize:10,color:C.greyMid}}>Specjalne</span>
           </div>
+          <div style={{display:"flex",alignItems:"center",gap:4}}>
+            <div style={{width:8,height:8,borderRadius:2,background:"#FFF0EE",border:"1px solid #FADBD8"}}/>
+            <span style={{fontSize:10,color:"#E74C3C"}}>Weekend / Święto</span>
+          </div>
         </div>
 
       </div>
 
-      {/* ── LISTA SZKOLEŃ ── */}
       <div style={{padding:"10px 12px 12px"}}>
 
-        {/* Nagłówek sekcji */}
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
           <span style={{fontSize:11,fontWeight:700,color:C.greyMid,letterSpacing:1}}>
             {selected
-              ? (() => { const d=new Date(selected+"T00:00:00"); return `${d.getDate()} ${T.months[d.getMonth()]} ${d.getFullYear()}`; })()
+              ? (() => {
+                  const d = new Date(selected+"T00:00:00");
+                  const holidayLabel = holidays[selected] ? ` · 🎌 ${holidays[selected]}` : "";
+                  return `${d.getDate()} ${T.months[d.getMonth()]} ${d.getFullYear()}${holidayLabel}`;
+                })()
               : T.upcoming_3}
           </span>
           {selected && (
@@ -240,7 +269,6 @@ export function ScheduleTab({ activeGroups }) {
           const barColor = isST ? "#8E44AD" : (grp?.color || C.green);
           const title = isST ? (s.custom_name || "Szkolenie specjalne") : t.title;
           const date = new Date(s.date + "T00:00:00");
-          const dayNames = ["Niedziela","Poniedziałek","Wtorek","Środa","Czwartek","Piątek","Sobota"];
 
           return (
             <div key={`${s.date}-${i}`} style={{
@@ -248,7 +276,6 @@ export function ScheduleTab({ activeGroups }) {
               boxShadow:"0 1px 3px rgba(0,0,0,.07)",
               borderLeft:`4px solid ${barColor}`
             }}>
-              {/* Data + Godzina */}
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
                 <span style={{fontSize:11,fontWeight:700,color:barColor}}>
                   {T.days_full[date.getDay()]}, {date.getDate()} {T.months[date.getMonth()]} {date.getFullYear()}
@@ -257,9 +284,7 @@ export function ScheduleTab({ activeGroups }) {
                   8:30
                 </span>
               </div>
-              {/* Nazwa szkolenia */}
               <div style={{fontSize:13,fontWeight:700,color:C.black,lineHeight:1.3,marginBottom:4}}>{title}</div>
-              {/* Tagi + Outlook */}
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",gap:6,flexWrap:"wrap",marginTop:4}}>
                 <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                   {isST ? (
