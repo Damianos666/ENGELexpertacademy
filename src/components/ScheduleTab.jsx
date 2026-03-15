@@ -3,6 +3,7 @@ import { C, GROUPS } from "../lib/constants";
 import { TRAININGS } from "../data/trainings";
 import { db } from "../lib/supabase";
 import { useT } from "../lib/LangContext";
+import { useUser } from "../lib/UserContext";
 
 
 
@@ -46,7 +47,8 @@ function downloadICS(s, t) {
 }
 
 
-export function ScheduleTab({ activeGroups, token }) {
+export function ScheduleTab({ activeGroups }) {
+  const { token } = useUser();
   const T = useT();
   const [scheduled, setScheduled]   = useState([]);
   const [loading,   setLoading]     = useState(true);

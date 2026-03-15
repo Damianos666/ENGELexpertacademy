@@ -6,6 +6,7 @@ import { Spinner, SecTitle, ClipboardSvg } from "./SharedUI";
 import { CelebModal, CertModal } from "./Modals";
 import { useT } from "../lib/LangContext";
 import { QuizGame, QuizResultModal } from "./QuizGame";
+import { useUser } from "../lib/UserContext";
 
 function formatDays(n, T) {
   const d = parseInt(n, 10);
@@ -13,7 +14,8 @@ function formatDays(n, T) {
   return d === 1 ? `1 ${T.day_unit}` : `${d} ${T.days_unit}`;
 }
 
-export function TrainingTab({ user, completed, onComplete, activeGroups, loading }) {
+export function TrainingTab({ completed, onComplete, activeGroups, loading }) {
+  const { user } = useUser();
   const T = useT();
   const [code,        setCode]        = useState("");
   const [status,      setStatus]      = useState(null);

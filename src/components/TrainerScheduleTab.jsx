@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { C, GROUPS, TRAINERS } from "../lib/constants";
 import { TRAININGS } from "../data/trainings";
 import { db } from "../lib/supabase";
+import { useUser } from "../lib/UserContext";
 
 const MONTHS_PL = ["Styczeń","Luty","Marzec","Kwiecień","Maj","Czerwiec",
                    "Lipiec","Sierpień","Wrzesień","Październik","Listopad","Grudzień"];
@@ -41,7 +42,8 @@ function loadActiveTrainers(trainerNum) {
   return trainerNum != null ? [Number(trainerNum)] : ALL_TRAINERS;
 }
 
-export function TrainerScheduleTab({ token, trainerNum }) {
+export function TrainerScheduleTab({ trainerNum }) {
+  const { token } = useUser();
   const now       = new Date();
   const todayISO  = toISO(now);
 

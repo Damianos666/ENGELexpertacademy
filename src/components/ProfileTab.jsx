@@ -6,8 +6,10 @@ import { calcProgress } from "../lib/helpers";
 import { Toggle, SecTitle } from "./SharedUI";
 import { log, warn, err as logErr } from "../lib/logger";
 import { useT, useLang } from "../lib/LangContext";
+import { useUser } from "../lib/UserContext";
 
-export function ProfileTab({ user, setUser, completed, activeGroups, setActiveGroups, onLogout, trainerView, setTrainerView }) {
+export function ProfileTab({ completed, activeGroups, setActiveGroups, onLogout, trainerView, setTrainerView }) {
+  const { user, setUser } = useUser();
   const T = useT();
   const { lang, switchLang } = useLang();
   const [editName,  setEditName]  = useState(user.displayName);
