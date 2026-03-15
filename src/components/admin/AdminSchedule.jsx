@@ -290,6 +290,7 @@ export function AdminSchedule({ token }) {
         is_hidden: isHidden,
         is_outgoing: isOutgoing,
         notes: notes.trim(),
+        participants_count: partCount !== "" ? parseInt(partCount) : null,
       };
       await db.insert(token, "scheduled_trainings", payload);
       setMsg({ok:true,text:"✓ Dodano szkolenie do planerza!"});
