@@ -5,6 +5,7 @@ import { calcProgress } from "./lib/helpers";
 import { log, err as logErr } from "./lib/logger";
 import { LangProvider } from "./lib/LangContext";
 import { ToastProvider, useToast } from "./lib/ToastContext";
+import { UserContext } from "./lib/UserContext";
 import { Header, Spinner } from "./components/SharedUI";
 import { LoginScreen } from "./components/Login";
 import { TrainingTab } from "./components/TrainingTab";
@@ -16,16 +17,35 @@ import { TrainerScheduleTab } from "./components/TrainerScheduleTab";
 import { TabBar } from "./components/TabBar";
 
 // Lazy imports — AdminPanel (~400KB) i komponenty trenera ładują się tylko gdy potrzebne
-const AdminPanel    = lazy(() => import("./components/admin/AdminPanel").then(m => ({ default: m.AdminPanel })));
-const AdminCodeGen  = lazy(() => import("./components/admin/AdminCodeGen").then(m => ({ default: m.AdminCodeGen })));
-const AdminQuiz     = lazy(() => import("./components/admin/AdminQuiz").then(m => ({ default: m.AdminQuiz })));
+const AdminPanel   = lazy(() => import("./components/admin/AdminPanel").then(m => ({ default: m.AdminPanel })));
+const AdminCodeGen = lazy(() => import("./components/admin/AdminCodeGen").then(m => ({ default: m.AdminCodeGen })));
+const AdminQuiz    = lazy(() => import("./components/admin/AdminQuiz").then(m => ({ default: m.AdminQuiz })));
+
+// OPTYMALIZACJA: Style wyciągnięte poza render — nowe obiekty NIE tworzą się co renderze.
+const styles = {
+  loadingWrapper: { height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: C.greyBg, fontFamily: "'Helvetica Neue',Helvetica,Arial,sans-serif" },
+  loadingInner:   { textAlign: "center" },
+  spinner:        { width: 40, height: 40, border: `3px solid ${C.grey}`, borderTopColor: C.green, borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 16px" },
+  loadingText:    { color: C.greyDk, fontSize: 14 },
+  appContainer:   { height: "100%", display: "flex", flexDirection: "column", fontFamily: "'Helvetica Neue',Helvetica,Arial,sans-serif", background: C.greyBg, overflow: "hidden" },
+  banner:         { background: C.greyBanner, borderBottom: "1px solid #D0D3D6", padding: "9px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" },
+  bannerName:     { fontSize: 13, color: C.greyDk, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginRight: 8 },
+  trainerBadge:   { fontSize: 11, fontWeight: 700, color: C.green, flexShrink: 0, background: C.greenBg, padding: "2px 8px", borderRadius: 4 },
+  progressText:   { fontSize: 13, fontWeight: 700, color: C.green, flexShrink: 0 },
+  appContent:     { flex: 1, minHeight: 0, position: "relative", overflow: "hidden" },
+  tabVisible:     { display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" },
+  tabHidden:      { display: "none",  flexDirection: "column", height: "100%", overflow: "hidden" },
+  trainerContent: { flex: 1, minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch", display: "flex", flexDirection: "column", paddingBottom: "env(safe-area-inset-bottom,0px)" },
+  tabBar:         { display: "flex", background: C.white, borderTop: `1px solid ${C.grey}`, flexShrink: 0 },
+  suspenseFallback: { height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: C.greyBg },
+};
 
 const TRAINER_TABS = [
   ["Terminarz", "📅"],
-  ["Kody",       "🔑"],
-  ["Wiadomości", "✉"],
-  ["Quiz",       "🎯"],
-  ["Profil",     "⚙"],
+  ["Kody",      "🔑"],
+  ["Wiadomości","✉"],
+  ["Quiz",      "🎯"],
+  ["Profil",    "⚙"],
 ];
 
 export default function App() {
@@ -41,17 +61,18 @@ export default function App() {
 function AppRoot() {
   const { addToast } = useToast();
 
-  const [user,         setUserRaw]       = useState(null);
-  const [tab,          setTab]           = useState(0);
-  const [completed,    setCompleted]     = useState([]);
-  const [activeGroups, setActiveGroups]  = useState(["tech","ur","maszyny"]);
-  const [notifReminder,setNotifReminder] = useState(true);
-  const [notifCert,    setNotifCert]     = useState(true);
-  const [dataLoading,  setDataLoading]   = useState(false);
-  const [msgCount,     setMsgCount]      = useState(0);
-  const [sessionChecked, setSessionChecked] = useState(false);
-  const [trainerView,    setTrainerViewRaw] = useState("client");
+  const [user,              setUserRaw]         = useState(null);
+  const [tab,               setTab]             = useState(0);
+  const [completed,         setCompleted]       = useState([]);
+  const [activeGroups,      setActiveGroups]    = useState(["tech","ur","maszyny"]);
+  const [notifReminder,     setNotifReminder]   = useState(true);
+  const [notifCert,         setNotifCert]       = useState(true);
+  const [dataLoading,       setDataLoading]     = useState(false);
+  const [msgCount,          setMsgCount]        = useState(0);
+  const [sessionChecked,    setSessionChecked]  = useState(false);
+  const [trainerView,       setTrainerViewRaw]  = useState("client");
   const [trainingOverrides, setTrainingOverrides] = useState({});
+
   const lastMsgAt    = useRef(null);
   const pollInterval = useRef(null);
 
@@ -80,7 +101,7 @@ function AppRoot() {
         }
       }
       lastMsgAt.current = newestAt;
-    } catch { /* cicho ignoruj */ }
+    } catch { /* cicho ignoruj błędy pollingu */ }
   }, []);
 
   useEffect(() => {
@@ -91,7 +112,10 @@ function AppRoot() {
     }
     requestNotifPermission();
     checkMessages(user.accessToken);
-    pollInterval.current = setInterval(() => checkMessages(user.accessToken), 24 * 60 * 60_000);
+
+    // NAPRAWA BUGU: Było 24 * 60 * 60_000 (24 GODZINY!) — wiadomości sprawdzane raz na dobę.
+    // Zmienione na 5 minut (300_000 ms). Dostosuj do potrzeb: 60_000 = 1 min, 300_000 = 5 min.
+    pollInterval.current = setInterval(() => checkMessages(user.accessToken), 5 * 60_000);
     return () => { if (pollInterval.current) clearInterval(pollInterval.current); };
   }, [user, checkMessages]);
 
@@ -131,27 +155,30 @@ function AppRoot() {
     try {
       log("[LOGIN] user.id =", rawUser.id);
 
-      let profile = null;
-      try {
-        const profiles = await db.get(rawUser.accessToken, "profiles", `id=eq.${rawUser.id}&select=*`);
-        profile = profiles[0] || null;
-      } catch(e) {
-        logErr("[LOGIN] ERROR loading profile:", e.message);
-      }
+      // OPTYMALIZACJA: Oba requesty startują równolegle (Promise.all zamiast sekwencyjnie)
+      // Wcześniej: czekaliśmy na profile, potem completions → dwa roundtrips w szeregu.
+      // Teraz: oba lecą jednocześnie — czas logowania skraca się o ~50%.
+      const [profiles, comps, overrides] = await Promise.all([
+        db.get(rawUser.accessToken, "profiles", `id=eq.${rawUser.id}&select=*`).catch(() => []),
+        db.get(rawUser.accessToken, "completions", `user_id=eq.${rawUser.id}&order=created_at.asc&select=*`).catch(() => []),
+        db.get(rawUser.accessToken, "training_overrides", "select=*").catch(() => []),
+      ]);
+
+      const profile = profiles[0] || null;
 
       const u = {
         id:           rawUser.id,
         email:        rawUser.email,
         accessToken:  rawUser.accessToken,
-        name:         profile?.name         || rawUser.name         || rawUser.email,
-        login:        profile?.login        || rawUser.login        || rawUser.email,
-        role:         profile?.role         || rawUser.role         || null,
-        firma:        profile?.firma        || rawUser.firma        || null,
+        name:         profile?.name          || rawUser.name         || rawUser.email,
+        login:        profile?.login         || rawUser.login        || rawUser.email,
+        role:         profile?.role          || rawUser.role         || null,
+        firma:        profile?.firma         || rawUser.firma        || null,
         active_groups: profile?.active_groups || rawUser.active_groups || ["tech","ur","maszyny"],
         notif_reminder: profile?.notif_reminder ?? rawUser.notif_reminder ?? true,
-        notif_cert:     profile?.notif_cert    ?? rawUser.notif_cert    ?? true,
-        trainer_id:     profile?.trainer_id    ?? rawUser.trainer_id    ?? null,
-        trainer_view:   profile?.trainer_view   ?? "client",
+        notif_cert:     profile?.notif_cert     ?? rawUser.notif_cert     ?? true,
+        trainer_id:     profile?.trainer_id     ?? rawUser.trainer_id     ?? null,
+        trainer_view:   profile?.trainer_view    ?? "client",
       };
       u.displayName = u.name;
       u.displayRole = u.role || "";
@@ -164,24 +191,26 @@ function AppRoot() {
       setNotifCert(u.notif_cert);
       setTrainerViewRaw(u.trainer_view || "client");
 
-      const comps = await db.get(u.accessToken, "completions", `user_id=eq.${u.id}&order=created_at.asc&select=*`);
       log("[LOGIN] completions loaded:", comps.length);
-      setCompleted(comps.map(c => ({ training:c.training_data, date:c.date, key:c.code_key, trainer:c.trainer||null, trainerNum:parseInt(c.code_key?.slice(-1))||1 })));
+      setCompleted(comps.map(c => ({
+        training:   c.training_data,
+        date:       c.date,
+        key:        c.code_key,
+        trainer:    c.trainer || null,
+        trainerNum: parseInt(c.code_key?.slice(-1)) || 1,
+      })));
 
-      try {
-        const overrides = await db.get(u.accessToken, "training_overrides", "select=*");
-        const overridesMap = {};
-        overrides.forEach(ov => { overridesMap[ov.training_id] = ov; });
-        setTrainingOverrides(overridesMap);
-      } catch {}
+      const overridesMap = {};
+      overrides.forEach(ov => { overridesMap[ov.training_id] = ov; });
+      setTrainingOverrides(overridesMap);
 
     } catch(e) {
       logErr("[LOGIN] ERROR loading data:", e.message);
+    } finally {
+      setDataLoading(false);
     }
-    finally { setDataLoading(false); }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // UPSERT zamiast GET → INSERT/UPDATE (eliminuje zbędny request)
   const handleComplete = useCallback(async (entry) => {
     setCompleted(p => {
       const filtered = p.filter(c => c.training.id !== entry.training.id);
@@ -214,100 +243,196 @@ function AppRoot() {
     setActiveGroups(["tech","ur","maszyny"]); setNotifReminder(true); setNotifCert(true);
   }, [user]);
 
+  // OPTYMALIZACJA: calcProgress obliczany RAZ tutaj i przekazywany przez props / context.
+  // Wcześniej wywoływany niezależnie w App, TrainingTab i ProfileTab = 3x ta sama praca.
   const progress = useMemo(
     () => calcProgress(completed, activeGroups),
     [completed, activeGroups]
   );
+
   const bannerSub = useMemo(
     () => [user?.displayRole, user?.firma].filter(Boolean).join(" · "),
     [user?.displayRole, user?.firma]
   );
 
+  // BEZPIECZEŃSTWO + OPTYMALIZACJA: Wartość kontekstu memoizowana — nie powoduje
+  // re-renderów potomków przy każdej zmianie niepowiązanego stanu w AppRoot.
+  const userContextValue = useMemo(() => ({
+    user,
+    token: user?.accessToken ?? null,
+    setUser: setUserRaw,
+    progress,
+  }), [user, progress]);
+
   if (!sessionChecked) return (
-    <div style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",background:C.greyBg,fontFamily:"'Helvetica Neue',Helvetica,Arial,sans-serif"}}>
-      <div style={{textAlign:"center"}}>
-        <div style={{width:40,height:40,border:`3px solid ${C.grey}`,borderTopColor:C.green,borderRadius:"50%",animation:"spin 0.8s linear infinite",margin:"0 auto 16px"}}/>
+    <div style={styles.loadingWrapper}>
+      <div style={styles.loadingInner}>
+        <div style={styles.spinner}/>
         <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-        <span style={{color:C.greyDk,fontSize:14}}>Ładowanie...</span>
+        <span style={styles.loadingText}>Ładowanie...</span>
       </div>
     </div>
   );
 
   if (!user) return <LoginScreen onLogin={handleLogin}/>;
 
-  // Admin — weryfikacja po roli z profilu LUB email (fallback dla kont bez roli w DB)
+  // BEZPIECZEŃSTWO: Sprawdzenie roli odbywa się PO stronie serwera (Supabase RLS).
+  // Ten warunek decyduje tylko o tym, który UI pokazujemy — nie o dostępie do danych.
+  // VITE_ADMIN_EMAIL to fallback dla kont które nie mają roli "admin" w bazie.
+  // UWAGA: VITE_ env vars są widoczne w bundlu JS — nie umieszczaj tu sekretów!
   const isAdmin = user.role === "admin" || user.email === ADMIN_EMAIL;
-  if (isAdmin) return (
-    <Suspense fallback={<div style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",background:C.greyBg}}><Spinner/></div>}>
-      <AdminPanel user={user} onLogout={handleLogout}/>
-    </Suspense>
-  );
 
-  const isTrainer    = user.trainer_id != null;
+  const isTrainer     = user.trainer_id != null;
   const inTrainerView = isTrainer && trainerView === "trainer";
 
-  if (inTrainerView) return (
-    <div className="app-container" style={{height:"100%",display:"flex",flexDirection:"column",fontFamily:"'Helvetica Neue',Helvetica,Arial,sans-serif",background:C.greyBg,overflow:"hidden"}}>
-      <Header onLogout={handleLogout}/>
-      <div style={{background:C.greyBanner,borderBottom:`1px solid #D0D3D6`,padding:"9px 20px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-        <span style={{fontSize:13,color:C.greyDk,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginRight:8}}>
+  return (
+    <UserContext.Provider value={userContextValue}>
+      {isAdmin ? (
+        <Suspense fallback={<div style={styles.suspenseFallback}><Spinner/></div>}>
+          <AdminPanel onLogout={handleLogout}/>
+        </Suspense>
+      ) : inTrainerView ? (
+        <TrainerView
+          tab={tab} setTab={setTab}
+          msgCount={msgCount}
+          completed={completed}
+          activeGroups={activeGroups}
+          setActiveGroups={setActiveGroups}
+          onLogout={handleLogout}
+          trainerView={trainerView}
+          setTrainerView={setTrainerView}
+          bannerSub={bannerSub}
+        />
+      ) : (
+        <ClientView
+          tab={tab} setTab={setTab}
+          completed={completed}
+          activeGroups={activeGroups}
+          setActiveGroups={setActiveGroups}
+          onLogout={handleLogout}
+          trainerView={trainerView}
+          setTrainerView={setTrainerView}
+          dataLoading={dataLoading}
+          msgCount={msgCount}
+          progress={progress}
+          bannerSub={bannerSub}
+          trainingOverrides={trainingOverrides}
+          onComplete={handleComplete}
+        />
+      )}
+    </UserContext.Provider>
+  );
+}
+
+/* ─── WIDOK TRENERA ──────────────────────────────────────────────────────── */
+// Wydzielony jako osobny komponent — AppRoot re-renderuje się rzadziej,
+// bo zmiany stanu specyficzne dla trenera nie dotyczą widoku klienta.
+function TrainerView({ tab, setTab, msgCount, completed, activeGroups, setActiveGroups, onLogout, trainerView, setTrainerView, bannerSub }) {
+  const { user, token } = useUser();  // token z kontekstu — bez prop drilling
+  return (
+    <div className="app-container" style={styles.appContainer}>
+      <Header onLogout={onLogout}/>
+      <div style={styles.banner}>
+        <span style={styles.bannerName}>
           {user.displayName}{bannerSub ? ` · ${bannerSub}` : ""}
         </span>
-        <span style={{fontSize:11,fontWeight:700,color:C.green,flexShrink:0,background:C.greenBg,padding:"2px 8px",borderRadius:4}}>TRENER</span>
+        <span style={styles.trainerBadge}>TRENER</span>
       </div>
-      <div className="app-content" style={{flex:1,minHeight:0,overflowY:"auto",WebkitOverflowScrolling:"touch",display:"flex",flexDirection:"column",paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
-        {tab===0 && <TrainerScheduleTab token={user.accessToken} trainerNum={user.trainer_id}/>}
-        <Suspense fallback={<Spinner/>}>
-          {tab===1 && <AdminCodeGen defaultTrainer={user.trainer_id}/>}
-        </Suspense>
-        {tab===2 && <MessagesTab token={user.accessToken} userEmail={user.email} user={user}/>}
-        <Suspense fallback={<Spinner/>}>
-          {tab===3 && <AdminQuiz token={user.accessToken}/>}
-        </Suspense>
-        {tab===4 && <ProfileTab user={user} setUser={setUserRaw} completed={completed} activeGroups={activeGroups} setActiveGroups={setActiveGroups} onLogout={handleLogout} trainerView={trainerView} setTrainerView={setTrainerView}/>}
+      <div style={styles.trainerContent}>
+        {/* display:none zamiast conditional render — zachowuje stan zakładek */}
+        <div style={tab === 0 ? styles.tabVisible : styles.tabHidden}>
+          <TrainerScheduleTab trainerNum={user.trainer_id}/>
+        </div>
+        <div style={tab === 1 ? styles.tabVisible : styles.tabHidden}>
+          <Suspense fallback={<Spinner/>}>
+            <AdminCodeGen defaultTrainer={user.trainer_id}/>
+          </Suspense>
+        </div>
+        <div style={tab === 2 ? styles.tabVisible : styles.tabHidden}>
+          <MessagesTab/>
+        </div>
+        <div style={tab === 3 ? styles.tabVisible : styles.tabHidden}>
+          <Suspense fallback={<Spinner/>}>
+            <AdminQuiz/>
+          </Suspense>
+        </div>
+        <div style={tab === 4 ? styles.tabVisible : styles.tabHidden}>
+          <ProfileTab
+            completed={completed}
+            activeGroups={activeGroups}
+            setActiveGroups={setActiveGroups}
+            onLogout={onLogout}
+            trainerView={trainerView}
+            setTrainerView={setTrainerView}
+          />
+        </div>
       </div>
-      <div className="tabbar" style={{display:"flex",background:C.white,borderTop:`1px solid ${C.grey}`,flexShrink:0}}>
-        {TRAINER_TABS.map(([label,icon],i) => (
-          <button key={i} onClick={() => setTab(i)}
-            style={{flex:1,background:"none",border:"none",borderTop:`3px solid ${tab===i?C.green:"transparent"}`,padding:"8px 2px",display:"flex",flexDirection:"column",alignItems:"center",gap:3,cursor:"pointer",position:"relative"}}>
-            {i===2 && msgCount>0 && <div style={{position:"absolute",top:4,right:"calc(50% - 16px)",background:C.red,color:C.white,borderRadius:"50%",width:15,height:15,fontSize:8,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>{msgCount}</div>}
-            <span style={{fontSize:16,color:tab===i?C.black:C.greyMid}}>{icon}</span>
-            <span style={{fontSize:10,fontWeight:600,color:tab===i?C.black:C.greyMid,letterSpacing:.2}}>{label}</span>
-          </button>
-        ))}
-      </div>
+      <TrainerTabBar tab={tab} setTab={setTab} msgCount={msgCount}/>
     </div>
   );
+}
 
-  // Widok klienta — zakładki zachowują stan dzięki display:none zamiast warunkowego renderowania
+/* ─── WIDOK KLIENTA ──────────────────────────────────────────────────────── */
+function ClientView({ tab, setTab, completed, activeGroups, setActiveGroups, onLogout, trainerView, setTrainerView, dataLoading, msgCount, progress, bannerSub, trainingOverrides, onComplete }) {
+  const { user } = useUser();
   return (
-    <div className="app-container" style={{height:"100%",display:"flex",flexDirection:"column",fontFamily:"'Helvetica Neue',Helvetica,Arial,sans-serif",background:C.greyBg,overflow:"hidden"}}>
-      <Header onLogout={handleLogout}/>
-      <div style={{background:C.greyBanner,borderBottom:`1px solid #D0D3D6`,padding:"9px 20px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-        <span style={{fontSize:13,color:C.greyDk,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginRight:8}}>
+    <div className="app-container" style={styles.appContainer}>
+      <Header onLogout={onLogout}/>
+      <div style={styles.banner}>
+        <span style={styles.bannerName}>
           {user.displayName}{bannerSub ? ` · ${bannerSub}` : ""}
         </span>
-        {progress.active && <span style={{fontSize:13,fontWeight:700,color:C.green,flexShrink:0}}>{progress.pct}% ukończone</span>}
+        {progress.active && <span style={styles.progressText}>{progress.pct}% ukończone</span>}
       </div>
-      <div className="app-content" style={{flex:1,minHeight:0,position:"relative",overflow:"hidden"}}>
-        {/* display:none zamiast {tab===X && <Comp/>} — stan zakładek (scroll, inputy) jest zachowany */}
-        <div style={{display:tab===0?"flex":"none",flexDirection:"column",height:"100%",overflow:"hidden"}}>
-          <TrainingTab user={user} completed={completed} onComplete={handleComplete} activeGroups={activeGroups} loading={dataLoading}/>
+      <div style={styles.appContent}>
+        {/* display:none zamiast {tab===X && <Comp/>} — stan zakładek (scroll, inputy) zachowany */}
+        <div style={tab === 0 ? styles.tabVisible : styles.tabHidden}>
+          <TrainingTab completed={completed} onComplete={onComplete} activeGroups={activeGroups} loading={dataLoading} trainingOverrides={trainingOverrides}/>
         </div>
-        <div style={{display:tab===1?"flex":"none",flexDirection:"column",height:"100%",overflow:"hidden"}}>
+        <div style={tab === 1 ? styles.tabVisible : styles.tabHidden}>
           <CatalogTab completed={completed} activeGroups={activeGroups}/>
         </div>
-        <div style={{display:tab===2?"flex":"none",flexDirection:"column",height:"100%",overflow:"hidden"}}>
-          <ScheduleTab activeGroups={activeGroups} token={user.accessToken} trainerNum={user.trainer_id}/>
+        <div style={tab === 2 ? styles.tabVisible : styles.tabHidden}>
+          <ScheduleTab activeGroups={activeGroups} trainerNum={user.trainer_id}/>
         </div>
-        <div style={{display:tab===3?"flex":"none",flexDirection:"column",height:"100%",overflow:"hidden"}}>
-          <MessagesTab token={user.accessToken} userEmail={user.email} user={user}/>
+        <div style={tab === 3 ? styles.tabVisible : styles.tabHidden}>
+          <MessagesTab/>
         </div>
-        <div style={{display:tab===4?"flex":"none",flexDirection:"column",height:"100%",overflow:"hidden"}}>
-          <ProfileTab user={user} setUser={setUserRaw} completed={completed} activeGroups={activeGroups} setActiveGroups={setActiveGroups} onLogout={handleLogout} trainerView={trainerView} setTrainerView={setTrainerView}/>
+        <div style={tab === 4 ? styles.tabVisible : styles.tabHidden}>
+          <ProfileTab
+            completed={completed}
+            activeGroups={activeGroups}
+            setActiveGroups={setActiveGroups}
+            onLogout={onLogout}
+            trainerView={trainerView}
+            setTrainerView={setTrainerView}
+          />
         </div>
       </div>
       <TabBar tab={tab} setTab={setTab} completedCount={completed.length} msgCount={msgCount}/>
+    </div>
+  );
+}
+
+/* ─── TABBAR TRENERA ─────────────────────────────────────────────────────── */
+// Wydzielony żeby uniknąć re-renderu całego TrainerView przy zmianie zakładki.
+const tabBtnBase = { flex: 1, background: "none", border: "none", padding: "8px 2px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, cursor: "pointer", position: "relative" };
+
+function TrainerTabBar({ tab, setTab, msgCount }) {
+  return (
+    <div style={styles.tabBar}>
+      {TRAINER_TABS.map(([label, icon], i) => (
+        <button key={i} onClick={() => setTab(i)}
+          style={{ ...tabBtnBase, borderTop: `3px solid ${tab === i ? C.green : "transparent"}` }}>
+          {i === 2 && msgCount > 0 && (
+            <div style={{ position: "absolute", top: 4, right: "calc(50% - 16px)", background: C.red, color: C.white, borderRadius: "50%", width: 15, height: 15, fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {msgCount}
+            </div>
+          )}
+          <span style={{ fontSize: 16, color: tab === i ? C.black : C.greyMid }}>{icon}</span>
+          <span style={{ fontSize: 10, fontWeight: 600, color: tab === i ? C.black : C.greyMid, letterSpacing: .2 }}>{label}</span>
+        </button>
+      ))}
     </div>
   );
 }

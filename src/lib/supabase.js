@@ -20,7 +20,7 @@ export const authHeaders = (token) => ({
 // W localStorage zapisujemy wyłącznie refresh_token + minimalne dane usera.
 // Przy XSS atakujący nie może wyciągnąć access_token z localStorage.
 const SESSION_KEY = "eea_session";
-let _memoryToken = null; // access_token — tylko w RAM, nie w localStorage
+let _memoryToken = null;
 
 export const session = {
   save: (accessToken, refreshToken, user) => {
@@ -98,31 +98,55 @@ export const auth = {
 };
 
 /* ─── DB ─────────────────────────────────────────────────────────────────── */
+// OPTYMALIZACJA: Wszystkie metody przyjmują opcjonalny { signal } z AbortController.
+// Dzięki temu komponenty mogą anulować in-flight requesty przy odmontowaniu,
+// eliminując memory leaks i błędy "Can't perform a React state update on unmounted component".
+//
+// Użycie w komponencie:
+//   useEffect(() => {
+//     const ctrl = new AbortController();
+//     db.get(token, "messages", "...", { signal: ctrl.signal })
+//       .then(setMessages).catch(e => { if (e.name !== "AbortError") setErr(e.message); });
+//     return () => ctrl.abort();
+//   }, [token]);
 export const db = {
-  get: async (token, table, query = "") => {
-    const r = await fetch(`${SB_URL}/rest/v1/${table}?${query}`, { headers: authHeaders(token) });
+  get: async (token, table, query = "", { signal } = {}) => {
+    const r = await fetch(`${SB_URL}/rest/v1/${table}?${query}`, {
+      headers: authHeaders(token),
+      signal,
+    });
     if (!r.ok) throw new Error(await r.text());
     return r.json();
   },
-  insert: async (token, table, data) => {
+
+  insert: async (token, table, data, { signal } = {}) => {
     const h = { ...authHeaders(token), "Prefer": "return=representation" };
-    const r = await fetch(`${SB_URL}/rest/v1/${table}`, { method: "POST", headers: h, body: JSON.stringify(data) });
+    const r = await fetch(`${SB_URL}/rest/v1/${table}`, {
+      method: "POST", headers: h, body: JSON.stringify(data), signal,
+    });
     if (!r.ok) throw new Error(await r.text());
     return r.json();
   },
-  update: async (token, table, match, data) => {
+
+  update: async (token, table, match, data, { signal } = {}) => {
     const h = { ...authHeaders(token), "Prefer": "return=representation" };
-    const r = await fetch(`${SB_URL}/rest/v1/${table}?${match}`, { method: "PATCH", headers: h, body: JSON.stringify(data) });
+    const r = await fetch(`${SB_URL}/rest/v1/${table}?${match}`, {
+      method: "PATCH", headers: h, body: JSON.stringify(data), signal,
+    });
     if (!r.ok) throw new Error(await r.text());
     return r.json();
   },
-  remove: async (token, table, match) => {
+
+  remove: async (token, table, match, { signal } = {}) => {
     const h = { ...authHeaders(token), "Prefer": "return=representation" };
-    const r = await fetch(`${SB_URL}/rest/v1/${table}?${match}`, { method: "DELETE", headers: h });
+    const r = await fetch(`${SB_URL}/rest/v1/${table}?${match}`, {
+      method: "DELETE", headers: h, signal,
+    });
     if (!r.ok) throw new Error(await r.text());
     return r.json();
   },
-  upsert: async (token, table, data, onConflict) => {
+
+  upsert: async (token, table, data, onConflict, { signal } = {}) => {
     const h = {
       ...authHeaders(token),
       "Prefer": "resolution=merge-duplicates,return=representation",
@@ -130,7 +154,9 @@ export const db = {
     const url = onConflict
       ? `${SB_URL}/rest/v1/${table}?on_conflict=${onConflict}`
       : `${SB_URL}/rest/v1/${table}`;
-    const r = await fetch(url, { method: "POST", headers: h, body: JSON.stringify(data) });
+    const r = await fetch(url, {
+      method: "POST", headers: h, body: JSON.stringify(data), signal,
+    });
     if (!r.ok) throw new Error(await r.text());
     return r.json();
   },
