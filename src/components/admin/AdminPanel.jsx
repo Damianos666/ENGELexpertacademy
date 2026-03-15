@@ -13,6 +13,12 @@ const tabHidden  = { display:"none" };
 export function AdminPanel({ user, onLogout }) {
   const [tab, setTab] = useState(0);
 
+  // Zabezpieczenie: jeśli user nie dotarł jeszcze przez props (np. lazy load race),
+  // nie renderuj zawartości — React spróbuje ponownie gdy user będzie dostępny.
+  if (!user) return null;
+
+  const token = user.accessToken;
+
   return (
     <div className="app-container" style={{height:"100%",display:"flex",flexDirection:"column",fontFamily:"'Helvetica Neue',Helvetica,Arial,sans-serif",background:C.greyBg,overflow:"hidden"}}>
       <div style={{background:C.darkHdr,paddingTop:"calc(12px + env(safe-area-inset-top, 0px))",paddingBottom:"12px",paddingLeft:"16px",paddingRight:"16px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0,boxSizing:"border-box"}}>
@@ -34,11 +40,10 @@ export function AdminPanel({ user, onLogout }) {
         ))}
       </div>
 
-      {/* display:none zamiast conditional render — zachowuje stan zakładek (filtry, scroll, formularze) */}
       <div style={{flex:1,minHeight:0,position:"relative",overflow:"hidden"}}>
-        <div style={tab===0 ? tabVisible : tabHidden}><AdminSchedule token={user.accessToken}/></div>
-        <div style={tab===1 ? tabVisible : tabHidden}><AdminMessages token={user.accessToken}/></div>
-        <div style={tab===2 ? tabVisible : tabHidden}><AdminTrainings token={user.accessToken}/></div>
+        <div style={tab===0 ? tabVisible : tabHidden}><AdminSchedule token={token}/></div>
+        <div style={tab===1 ? tabVisible : tabHidden}><AdminMessages token={token}/></div>
+        <div style={tab===2 ? tabVisible : tabHidden}><AdminTrainings token={token}/></div>
       </div>
     </div>
   );
