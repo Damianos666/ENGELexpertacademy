@@ -3,62 +3,43 @@ import { C, MSG_TYPES, ADMIN_EMAIL } from "../lib/constants";
 import { db } from "../lib/supabase";
 import { formatDate } from "../lib/helpers";
 import { Spinner, Toggle } from "./SharedUI";
-import { useToast } from "../lib/ToastContext";
 import { useT } from "../lib/LangContext";
-import { useUser } from "../lib/UserContext";  // OPTYMALIZACJA: token z kontekstu
 
 const CONTACT_EMAIL = import.meta.env.VITE_CONTACT_EMAIL || "";
 const CONTACT_PHONE = import.meta.env.VITE_CONTACT_PHONE || "";
 
-// OPTYMALIZACJA: memo — komponent nie re-renderuje się gdy rodzic się odświeży,
-// dopóki jego props się nie zmienią. MessagesTab nie przyjmuje już token/user przez props.
-export const MessagesTab = memo(function MessagesTab() {
+export function MessagesTab({ token, userEmail, user }) {
   const T = useT();
-  const { addToast } = useToast();
-  const { user, token } = useUser();  // token z UserContext — brak prop drilling
+  const isAdmin = userEmail === ADMIN_EMAIL;
 
-  const isAdmin  = user?.role === "admin" || user?.email === ADMIN_EMAIL;
-  const userName = user?.displayName || user?.name  || "";
-  const userMail = user?.email       || "";
-  const userRole = user?.role        || "";
-  const userFirma= user?.firma       || "";
-
-  const [messages,    setMessages]    = useState([]);
-  const [loading,     setLoading]     = useState(true);
-  const [err,         setErr]         = useState("");
-  const [showForm,    setShowForm]    = useState(false);
-  const [fTitle,      setFTitle]      = useState("");
-  const [fBody,       setFBody]       = useState("");
-  const [fType,       setFType]       = useState("info");
-  const [fPinned,     setFPinned]     = useState(false);
-  const [saving,      setSaving]      = useState(false);
-  const [formErr,     setFormErr]     = useState("");
-  const [deleting,    setDeleting]    = useState(null);
+  // Dane użytkownika wyciągnięte na poziomie komponentu
+  const userName  = user?.displayName || user?.name  || "";
+  const userMail  = user?.email       || userEmail   || "";
+  const userRole  = user?.role        || "";
+  const userFirma = user?.firma       || "";
+  const [messages,  setMessages]  = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [err,       setErr]       = useState("");
+  // formularz nowej wiadomości
+  const [showForm,  setShowForm]  = useState(false);
+  const [fTitle,    setFTitle]    = useState("");
+  const [fBody,     setFBody]     = useState("");
+  const [fType,     setFType]     = useState("info");
+  const [fPinned,   setFPinned]   = useState(false);
+  const [saving,    setSaving]    = useState(false);
+  const [formErr,   setFormErr]   = useState("");
+  const [deleting,  setDeleting]  = useState(null);
   const [contactOpen, setContactOpen] = useState(false);
 
-  useEffect(() => {
-    if (!token) return;
+  async function loadMessages() {
+    try {
+      const data = await db.get(token, "messages", "order=pinned.desc,created_at.desc&select=*");
+      setMessages(data);
+    } catch { setErr(T.cannot_load); }
+    finally { setLoading(false); }
+  }
 
-    // OPTYMALIZACJA: AbortController — jeśli komponent odmontuje się podczas
-    // ładowania, fetch zostanie anulowany i nie nastąpi setState na odmontowanym
-    // komponencie (eliminuje memory leak i warning w konsoli).
-    const ctrl = new AbortController();
-
-    async function loadMessages() {
-      try {
-        const data = await db.get(token, "messages", "order=pinned.desc,created_at.desc&select=*", { signal: ctrl.signal });
-        setMessages(data);
-      } catch(e) {
-        if (e.name === "AbortError") return;  // Normalne — komponent odmontowany
-        setErr(T.cannot_load);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadMessages();
-    return () => ctrl.abort();
-  }, [token, T.cannot_load]);  // FIX: token w deps — wcześniej brakowało (eslint-disable)
+  useEffect(() => { loadMessages(); }, []);
 
   async function sendMessage() {
     if (!fTitle.trim()) { setFormErr("Tytuł jest wymagany"); return; }
@@ -66,17 +47,14 @@ export const MessagesTab = memo(function MessagesTab() {
     setSaving(true); setFormErr("");
     try {
       await db.insert(token, "messages", {
-        title:  fTitle.trim(),
-        body:   fBody.trim(),
-        type:   fType,
-        pinned: fPinned,
+        title:   fTitle.trim(),
+        body:    fBody.trim(),
+        type:    fType,
+        pinned:  fPinned,
       });
       setFTitle(""); setFBody(""); setFType("info"); setFPinned(false);
       setShowForm(false);
-      // Odśwież listę po wysłaniu
-      const ctrl2 = new AbortController();
-      const data = await db.get(token, "messages", "order=pinned.desc,created_at.desc&select=*", { signal: ctrl2.signal });
-      setMessages(data);
+      await loadMessages();
     } catch(e) { setFormErr("Błąd wysyłania: " + e.message); }
     finally { setSaving(false); }
   }
@@ -86,146 +64,187 @@ export const MessagesTab = memo(function MessagesTab() {
     try {
       await db.remove(token, "messages", `id=eq.${id}`);
       setMessages(p => p.filter(m => m.id !== id));
-    } catch(e) { addToast("Błąd usuwania: " + e.message); }
+    } catch(e) { alert("Błąd usuwania: " + e.message); }
     finally { setDeleting(null); }
   }
 
-  if (loading) return (
-    <div style={{ background: C.greyBg, flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <Spinner/>
-    </div>
-  );
+  if (loading) return <div style={{background:C.greyBg,flex:1,display:"flex",alignItems:"center",justifyContent:"center"}}><Spinner/></div>;
 
   return (
-    <div style={{ background: C.greyBg, flex: 1, minHeight: 0, display: "flex", flexDirection: "column", position: "relative", overflow: "hidden" }}>
-      <div style={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch", padding: "12px 12px 80px" }}>
+    <div style={{background:C.greyBg,flex:1,minHeight:0,display:"flex",flexDirection:"column",position:"relative",overflow:"hidden"}}>
+    <div style={{flex:1,overflowY:"auto",WebkitOverflowScrolling:"touch"}}>
+      {err && <div style={{background:"#FDEDEC",border:`1px solid ${C.red}`,margin:12,padding:"12px 16px",fontSize:13,color:C.red}}>{err}</div>}
 
-        {err && (
-          <div style={{ background: "#FDEDEC", border: `1px solid ${C.red}`, marginBottom: 12, padding: "12px 16px", borderRadius: 8, fontSize: 13, color: C.red }}>
-            {err}
+      {/* PANEL ADMINA */}
+      {isAdmin && (
+        <div style={{margin:"12px 12px 0",background:C.white,border:`2px solid ${C.green}`,padding:16}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:showForm?16:0}}>
+            <div style={{fontSize:11,fontWeight:700,letterSpacing:1,color:C.greenDk,textTransform:"uppercase"}}>⚙ Panel administratora</div>
+            <button
+              style={{background:showForm?"none":C.black,border:`1px solid ${showForm?C.grey:C.black}`,color:showForm?C.greyDk:C.white,padding:"7px 14px",fontSize:12,fontWeight:600,cursor:"pointer"}}
+              onClick={() => { setShowForm(p => !p); setFormErr(""); }}>
+              {showForm ? "Anuluj" : "+ Nowa wiadomość"}
+            </button>
           </div>
-        )}
 
-        {/* PANEL ADMINA — formularz dodawania wiadomości */}
-        {isAdmin && (
-          <div style={{ marginBottom: 16 }}>
-            {!showForm ? (
-              <button onClick={() => setShowForm(true)}
-                style={{ width: "100%", background: C.green, color: C.white, border: "none", borderRadius: 8, padding: "12px 16px", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
-                + Nowa wiadomość
-              </button>
-            ) : (
-              <div style={{ background: C.white, borderRadius: 8, padding: 16, border: `1px solid ${C.grey}` }}>
-                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, color: C.black }}>Nowa wiadomość</div>
+          {showForm && (
+            <div style={{display:"flex",flexDirection:"column",gap:12}}>
+              {/* Tytuł */}
+              <div>
+                <label style={{display:"block",fontSize:11,fontWeight:700,color:C.greyDk,marginBottom:5,letterSpacing:.5}}>TYTUŁ *</label>
+                <input
+                  style={{width:"100%",border:`1.5px solid ${C.grey}`,padding:"9px 12px",fontSize:14,color:C.black,outline:"none",boxSizing:"border-box"}}
+                  value={fTitle} onChange={e => setFTitle(e.target.value)} placeholder="np. Nowe szkolenie w ofercie"/>
+              </div>
 
-                <input value={fTitle} onChange={e => setFTitle(e.target.value)} placeholder="Tytuł"
-                  style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${C.grey}`, borderRadius: 6, padding: "8px 10px", fontSize: 13, marginBottom: 8, outline: "none" }}/>
+              {/* Treść */}
+              <div>
+                <label style={{display:"block",fontSize:11,fontWeight:700,color:C.greyDk,marginBottom:5,letterSpacing:.5}}>TREŚĆ *</label>
+                <textarea
+                  style={{width:"100%",border:`1.5px solid ${C.grey}`,padding:"9px 12px",fontSize:13,color:C.black,outline:"none",boxSizing:"border-box",minHeight:90,resize:"vertical",fontFamily:"inherit"}}
+                  value={fBody} onChange={e => setFBody(e.target.value)} placeholder="Treść wiadomości..."/>
+              </div>
 
-                <textarea value={fBody} onChange={e => setFBody(e.target.value)} placeholder="Treść wiadomości..." rows={4}
-                  style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${C.grey}`, borderRadius: 6, padding: "8px 10px", fontSize: 13, marginBottom: 8, outline: "none", resize: "vertical" }}/>
-
-                <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-                  {Object.entries(MSG_TYPES).map(([key, val]) => (
+              {/* Typ */}
+              <div>
+                <label style={{display:"block",fontSize:11,fontWeight:700,color:C.greyDk,marginBottom:8,letterSpacing:.5}}>TYP WIADOMOŚCI</label>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                  {Object.entries(MSG_TYPES).map(([key, mt]) => (
                     <button key={key} onClick={() => setFType(key)}
-                      style={{ padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: "pointer",
-                        background: fType === key ? val.bg : C.greyBg,
-                        border: `1px solid ${fType === key ? val.color : C.grey}`,
-                        color: fType === key ? val.color : C.greyMid }}>
-                      {val.icon} {key}
+                      style={{padding:"6px 14px",fontSize:12,fontWeight:600,cursor:"pointer",border:`2px solid ${fType===key?mt.color:C.grey}`,background:fType===key?mt.bg:C.white,color:fType===key?mt.color:C.greyDk}}>
+                      {mt.icon} {key.charAt(0).toUpperCase()+key.slice(1)}
                     </button>
                   ))}
                 </div>
-
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                  <Toggle checked={fPinned} onChange={setFPinned}/>
-                  <span style={{ fontSize: 13, color: C.greyDk }}>Przypnij na górze</span>
-                </div>
-
-                {formErr && <div style={{ fontSize: 12, color: C.red, marginBottom: 8 }}>{formErr}</div>}
-
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button onClick={sendMessage} disabled={saving}
-                    style={{ flex: 1, background: C.green, color: C.white, border: "none", borderRadius: 6, padding: "10px", fontSize: 13, fontWeight: 700, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}>
-                    {saving ? "Wysyłanie..." : "Wyślij"}
-                  </button>
-                  <button onClick={() => { setShowForm(false); setFormErr(""); }}
-                    style={{ background: C.greyBg, color: C.greyDk, border: `1px solid ${C.grey}`, borderRadius: 6, padding: "10px 16px", fontSize: 13, cursor: "pointer" }}>
-                    Anuluj
-                  </button>
-                </div>
               </div>
-            )}
-          </div>
-        )}
 
-        {/* LISTA WIADOMOŚCI */}
-        {messages.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "60px 20px", color: C.greyMid }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>📭</div>
-            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>{T.no_messages}</div>
-            <div style={{ fontSize: 13 }}>{T.no_messages_sub}</div>
-          </div>
-        ) : (
-          messages.map(msg => {
-            const mt = MSG_TYPES[msg.type] || MSG_TYPES.info;
-            return (
-              <div key={msg.id} style={{ background: mt.bg, border: `1px solid ${mt.color}22`, borderRadius: 8, padding: "12px 14px", marginBottom: 10, position: "relative" }}>
-                {msg.pinned && (
-                  <div style={{ fontSize: 10, fontWeight: 700, color: mt.color, marginBottom: 4, letterSpacing: 0.5 }}>
-                    📌 {T.pinned}
-                  </div>
-                )}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: C.black, marginBottom: 4 }}>
-                      {mt.icon} {msg.title}
-                    </div>
-                    <div style={{ fontSize: 13, color: C.greyDk, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
-                      {msg.body}
-                    </div>
-                    <div style={{ fontSize: 11, color: C.greyMid, marginTop: 8 }}>
-                      {formatDate(msg.created_at)}
+              {/* Przypnij */}
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <Toggle value={fPinned} color={C.green} onChange={() => setFPinned(p => !p)}/>
+                <span style={{fontSize:13,color:C.black}}>Przypnij wiadomość na górze</span>
+              </div>
+
+              {/* Podgląd */}
+              {(fTitle||fBody) && (
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:C.greyDk,marginBottom:6,letterSpacing:.5}}>PODGLĄD</div>
+                  <div style={{background:fPinned?(MSG_TYPES[fType]||MSG_TYPES.info).bg:C.greyBg,border:`1px solid ${(MSG_TYPES[fType]||MSG_TYPES.info).color+"44"}`,padding:14}}>
+                    <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+                      <span style={{fontSize:18}}>{(MSG_TYPES[fType]||MSG_TYPES.info).icon}</span>
+                      <div>
+                        <div style={{fontSize:13,fontWeight:700,color:C.black,marginBottom:4}}>{fTitle||"(brak tytułu)"}</div>
+                        <div style={{fontSize:12,color:C.greyDk,lineHeight:1.6}}>{fBody||"(brak treści)"}</div>
+                        {fPinned && <span style={{fontSize:9,fontWeight:700,color:(MSG_TYPES[fType]||MSG_TYPES.info).color,letterSpacing:1}}>PRZYPIĘTE</span>}
+                      </div>
                     </div>
                   </div>
-                  {isAdmin && (
-                    <button onClick={() => deleteMessage(msg.id)} disabled={deleting === msg.id}
-                      style={{ background: "none", border: "none", cursor: "pointer", color: C.red, fontSize: 12, padding: "2px 6px", opacity: deleting === msg.id ? 0.5 : 1, flexShrink: 0 }}>
-                      {T.delete}
-                    </button>
-                  )}
+                </div>
+              )}
+
+              {formErr && <div style={{color:C.red,fontSize:12}}>{formErr}</div>}
+
+              <button
+                style={{background:saving?C.greyDk:C.black,border:"none",color:C.white,padding:"12px",fontSize:13,fontWeight:600,cursor:saving?"not-allowed":"pointer"}}
+                onClick={sendMessage} disabled={saving}>
+                {saving ? "Wysyłanie..." : "Wyślij wiadomość"}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* LISTA WIADOMOŚCI */}
+      {!messages.length && !err && (
+        <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"60%",padding:32,textAlign:"center"}}>
+          <div style={{fontSize:40,marginBottom:16}}>📭</div>
+          <div style={{fontSize:16,fontWeight:600,color:C.black,marginBottom:8}}>Brak wiadomości</div>
+          <div style={{fontSize:13,color:C.greyMid}}>Nowe ogłoszenia pojawią się tutaj.</div>
+        </div>
+      )}
+      <div style={{padding:"8px 12px 32px",display:"flex",flexDirection:"column",gap:8}}>
+        {messages.map(m => {
+          const mt = MSG_TYPES[m.type] || MSG_TYPES.info;
+          return (
+            <div key={m.id} style={{background:m.pinned?mt.bg:C.white,border:`1px solid ${m.pinned?mt.color+"44":"rgba(0,0,0,.06)"}`,boxShadow:"0 1px 3px rgba(0,0,0,.06)"}}>
+              <div style={{padding:16}}>
+                <div style={{display:"flex",alignItems:"flex-start",gap:12}}>
+                  <span style={{fontSize:20,flexShrink:0,marginTop:1}}>{mt.icon}</span>
+                  <div style={{flex:1}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:6}}>
+                      <div style={{fontSize:14,fontWeight:700,color:C.black,lineHeight:1.3}}>{m.title}</div>
+                      <div style={{display:"flex",gap:6,alignItems:"center",flexShrink:0}}>
+                        {m.pinned && <span style={{fontSize:9,fontWeight:700,color:mt.color,background:`${mt.color}22`,padding:"2px 8px",letterSpacing:1}}>PRZYPIĘTE</span>}
+                        {isAdmin && (
+                          <button
+                            onClick={() => { if(window.confirm("Usunąć tę wiadomość?")) deleteMessage(m.id); }}
+                            disabled={deleting===m.id}
+                            style={{background:"none",border:`1px solid ${C.red}`,color:C.red,padding:"3px 8px",fontSize:11,fontWeight:600,cursor:"pointer"}}>
+                            {deleting===m.id ? "..." : T.delete}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div style={{fontSize:13,color:C.greyDk,lineHeight:1.6}}>{m.body}</div>
+                    <div style={{fontSize:11,color:C.greyMid,marginTop:8}}>{formatDate(m.created_at)}</div>
+                  </div>
                 </div>
               </div>
-            );
-          })
-        )}
-
-        {/* KONTAKT */}
-        {(CONTACT_EMAIL || CONTACT_PHONE) && (
-          <div style={{ marginTop: 16 }}>
-            <button onClick={() => setContactOpen(p => !p)}
-              style={{ width: "100%", background: C.white, border: `1px solid ${C.grey}`, borderRadius: 8, padding: "12px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", color: C.greyDk, textAlign: "left" }}>
-              📞 Kontakt z organizatorem {contactOpen ? "▲" : "▼"}
-            </button>
-            {contactOpen && (
-              <div style={{ background: C.white, border: `1px solid ${C.grey}`, borderTop: "none", borderRadius: "0 0 8px 8px", padding: "12px 16px" }}>
-                {userName && <div style={{ fontSize: 13, color: C.greyDk, marginBottom: 4 }}>👤 {userName}{userFirma ? ` · ${userFirma}` : ""}</div>}
-                {CONTACT_EMAIL && (
-                  <a href={`mailto:${CONTACT_EMAIL}?subject=ENGEL Expert Academy — ${userRole || "Uczestnik"}: ${userName}&body=Imię i nazwisko: ${userName}%0AFirma: ${userFirma}%0AE-mail: ${userMail}`}
-                    style={{ display: "block", fontSize: 13, color: C.green, textDecoration: "none", marginBottom: 4 }}>
-                    ✉️ {CONTACT_EMAIL}
-                  </a>
-                )}
-                {CONTACT_PHONE && (
-                  <a href={`tel:${CONTACT_PHONE}`} style={{ display: "block", fontSize: 13, color: C.green, textDecoration: "none" }}>
-                    📱 {CONTACT_PHONE}
-                  </a>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
+            </div>
+          );
+        })}
       </div>
+
+    </div>{/* end scroll */}
+
+      {/* ── FAB KONTAKT ── */}
+      <div className="contact-fab" style={{position:"absolute",bottom:"calc(16px + env(safe-area-inset-bottom, 0px))",right:16,zIndex:900}}>
+        {contactOpen && (
+          <div style={{position:"absolute",bottom:56,right:0,background:C.white,borderRadius:12,boxShadow:"0 4px 24px rgba(0,0,0,.18)",padding:"8px 0",minWidth:180,overflow:"hidden"}}>
+            {/* EMAIL */}
+            <a href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                const subject = encodeURIComponent("Zapytanie o szkolenie - " + userName);
+                const body = encodeURIComponent(
+                  "Dzien dobry,\n\njestem zainteresowany/a szkoleniem.\n\nImie i nazwisko: " + userName +
+                  "\nStanowisko: " + userRole +
+                  "\nFirma: " + userFirma +
+                  "\nAdres e-mail: " + userMail +
+                  "\nTelefon kontaktowy: \n\nProsze o kontakt.\n\nZ powazaniem,\n" + userName
+                );
+                setContactOpen(false);
+                window.location.href = "mailto:" + CONTACT_EMAIL + "?subject=" + subject + "&body=" + body;
+              }}
+              style={{display:"flex",alignItems:"center",gap:12,padding:"13px 18px",textDecoration:"none",color:C.black,borderBottom:`1px solid ${C.grey}`}}>
+              <span style={{fontSize:20}}>✉️</span>
+              <div>
+                <div style={{fontSize:13,fontWeight:700}}>E-mail</div>
+                <div style={{fontSize:10,color:C.greyMid}}>{CONTACT_EMAIL}</div>
+              </div>
+            </a>
+            {/* TELEFON */}
+            <a href={`tel:${CONTACT_PHONE.replace(/\s/g,"")}`}
+              onClick={() => setContactOpen(false)}
+              style={{display:"flex",alignItems:"center",gap:12,padding:"13px 18px",textDecoration:"none",color:C.black}}>
+              <span style={{fontSize:20}}>📞</span>
+              <div>
+                <div style={{fontSize:13,fontWeight:700}}>Telefon</div>
+                <div style={{fontSize:10,color:C.greyMid}}>{CONTACT_PHONE}</div>
+              </div>
+            </a>
+          </div>
+        )}
+        <button onClick={() => setContactOpen(o => !o)}
+          style={{width:64,height:64,borderRadius:"50%",background:contactOpen?C.greyDk:C.black,border:"none",color:C.white,fontSize:52,cursor:"pointer",boxShadow:"0 2px 16px rgba(0,0,0,.3)",display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,paddingBottom:2}}>
+          {contactOpen ? "✕" : "✆"}
+        </button>
+      </div>
+
+      {/* Overlay zamykający menu */}
+      {contactOpen && (
+        <div onClick={() => setContactOpen(false)}
+          style={{position:"absolute",inset:0,zIndex:899}}/>
+      )}
     </div>
   );
-});
+}
