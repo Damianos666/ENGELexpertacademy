@@ -289,7 +289,7 @@ function AppRoot() {
     <UserContext.Provider value={userContextValue}>
       {isAdmin ? (
         <Suspense fallback={<div style={styles.suspenseFallback}><Spinner/></div>}>
-          <AdminPanel onLogout={handleLogout}/>
+          <AdminPanel user={user} onLogout={handleLogout}/>
         </Suspense>
       ) : inTrainerView ? (
         <TrainerView
