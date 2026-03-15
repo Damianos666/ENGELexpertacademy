@@ -4,6 +4,21 @@ import { TRAININGS } from "../data/trainings";
 import { db } from "../lib/supabase";
 import { useUser } from "../lib/UserContext";
 
+async function fetchHolidaysForYear(year) {
+  const key = `eea_holidays_PL_${year}`;
+  try {
+    const cached = localStorage.getItem(key);
+    if (cached) return JSON.parse(cached);
+    const res = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/PL`);
+    if (!res.ok) return {};
+    const data = await res.json();
+    const map = {};
+    data.forEach(h => { map[h.date] = h.localName; });
+    localStorage.setItem(key, JSON.stringify(map));
+    return map;
+  } catch { return {}; }
+}
+
 const MONTHS_PL = ["Styczeń","Luty","Marzec","Kwiecień","Maj","Czerwiec",
                    "Lipiec","Sierpień","Wrzesień","Październik","Listopad","Grudzień"];
 const ALL_TRAINERS = [1,2,3,4,5];
@@ -52,6 +67,7 @@ export function TrainerScheduleTab({ trainerNum }) {
   const [notesModal,     setNotesModal]     = useState(null);
   const [activeTrainers, setActiveTrainers] = useState(() => loadActiveTrainers(trainerNum));
   const [visibleLabel,   setVisibleLabel]   = useState({ year: now.getFullYear(), month: now.getMonth() });
+  const [holidays,       setHolidays]       = useState({});
 
   // Nieskończony timeline — tablica widocznych miesięcy {year, month}
   // Startujemy z poprzednim, bieżącym i następnym miesiącem
@@ -133,6 +149,13 @@ export function TrainerScheduleTab({ trainerNum }) {
       .finally(() => setLoading(false));
   }, [token]);
 
+
+  // Pobierz święta PL — raz przy starcie, cache w localStorage
+  useEffect(() => {
+    const y = now.getFullYear();
+    Promise.all([fetchHolidaysForYear(y), fetchHolidaysForYear(y + 1)])
+      .then(([a, b]) => setHolidays({ ...a, ...b }));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // Obsługa scrolla — rozszerza wstążkę i aktualizuje etykietę miesiąca
   function onScroll() {
     const el = timelineRef.current;
@@ -253,10 +276,12 @@ export function TrainerScheduleTab({ trainerNum }) {
                         </div>
                         {Array.from({length:days},(_,i)=>i+1).map(d=>{
                           const iso     = `${mon.year}-${pad(mon.month+1)}-${pad(d)}`;
-                          const isToday = iso === todayISO;
-                          const isWe    = new Date(iso+"T12:00:00").getDay()%6===0;
+                          const isToday   = iso === todayISO;
+                          const isWe      = new Date(iso+"T12:00:00").getDay()%6===0;
+                          const isHoliday = !!holidays[iso];
+                          const isDayOff  = isWe || isHoliday;
                           return (
-                            <div key={d} style={{width:cellW,minWidth:cellW,flexShrink:0,height:22,display:"flex",alignItems:"flex-end",justifyContent:"center",paddingBottom:2,fontSize:9,fontWeight:isToday?700:400,color:isToday?C.greenDk:isWe?"#aaa":C.greyMid,background:isToday?C.greenBg:isWe?"#e8e8e8":"transparent",borderRight:"1px solid #efefef",boxSizing:"border-box"}}>
+                            <div key={d} title={holidays[iso]||undefined} style={{width:cellW,minWidth:cellW,flexShrink:0,height:22,display:"flex",alignItems:"flex-end",justifyContent:"center",paddingBottom:2,fontSize:9,fontWeight:isToday||isHoliday?700:400,color:isToday?C.greenDk:isDayOff?"#aaa":C.greyMid,background:isToday?C.greenBg:isDayOff?"#e8e8e8":"transparent",borderRight:"1px solid #efefef",boxSizing:"border-box"}}>
                               {d}
                             </div>
                           );
@@ -278,9 +303,11 @@ export function TrainerScheduleTab({ trainerNum }) {
                     {/* Tło dni (weekendy, dzisiaj) */}
                     {months.map((mon,mi) => Array.from({length:daysInMon(mon.year,mon.month)},(_,i)=>i+1).map(d=>{
                       const iso     = `${mon.year}-${pad(mon.month+1)}-${pad(d)}`;
-                      const isToday = iso === todayISO;
-                      const isWe    = new Date(iso+"T12:00:00").getDay()%6===0;
-                      return <div key={`${mi}-${d}`} style={{position:"absolute",left:monthOffsets[mi]+(d-1)*cellW,top:0,width:cellW,height:"100%",background:isToday?"rgba(138,183,62,.12)":isWe?"rgba(0,0,0,.05)":"transparent",pointerEvents:"none"}}/>;
+                      const isToday   = iso === todayISO;
+                      const isWe      = new Date(iso+"T12:00:00").getDay()%6===0;
+                      const isHoliday = !!holidays[iso];
+                      const isDayOff  = isWe || isHoliday;
+                      return <div key={`${mi}-${d}`} title={holidays[iso]||undefined} style={{position:"absolute",left:monthOffsets[mi]+(d-1)*cellW,top:0,width:cellW,height:"100%",background:isToday?"rgba(138,183,62,.12)":isDayOff?"rgba(0,0,0,.05)":"transparent",pointerEvents:"none"}}/>;
                     }))}
 
                     {/* Pionowe linie separatorów miesięcy */}
