@@ -5,7 +5,7 @@ import { calcProgress } from "./lib/helpers";
 import { log, err as logErr } from "./lib/logger";
 import { LangProvider } from "./lib/LangContext";
 import { ToastProvider, useToast } from "./lib/ToastContext";
-import { UserContext } from "./lib/UserContext";
+import { UserContext, useUser } from "./lib/UserContext";
 import { Header, Spinner } from "./components/SharedUI";
 import { LoginScreen } from "./components/Login";
 import { TrainingTab } from "./components/TrainingTab";
