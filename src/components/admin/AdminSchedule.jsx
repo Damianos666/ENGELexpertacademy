@@ -78,6 +78,7 @@ export function AdminSchedule({ token }) {
 
   // Liczba dni widocznych w oknie bez scrollowania — zmień 12 na inną wartość aby dostosować szerokość komórek
   const [cellW, setCellW] = useState(28); // wartość zastępcza — ResizeObserver natychmiast ją poprawi
+  const [showAll, setShowAll] = useState(false);
 
   // Oblicza offsety pikselowe każdego miesiąca
   const { monthOffsets, totalWidth, originAbsDay: tlOrigin } = useMemo(() => {
@@ -376,7 +377,9 @@ export function AdminSchedule({ token }) {
     });
   }, [scheduled, months, cellW, formMode, selDate, selTraining, trainingMode, stName, previewEndDate, selTrainer]);
 
-  const listToShow = scheduled.filter(s => (s.end_date||s.date) >= todayISO).slice(0, 20);
+  const upcoming = scheduled.filter(s => (s.end_date||s.date) >= todayISO);
+  const LIST_LIMIT = 8;
+  const listToShow = showAll ? upcoming : upcoming.slice(0, LIST_LIMIT);
 
   // ── Helper: pasek szkolenia z gestami ──
   function BarItem({ bar }) {
@@ -634,8 +637,22 @@ export function AdminSchedule({ token }) {
       {!loading && (
         <div style={{background:C.white,borderRadius:8,padding:14,boxShadow:"0 1px 3px rgba(0,0,0,.07)"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,flexWrap:"wrap",gap:8}}>
-            <div style={{fontSize:11,fontWeight:700,color:C.greyMid,letterSpacing:1,textTransform:"uppercase"}}>
-              Nadchodzące ({listToShow.length})
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <div style={{fontSize:11,fontWeight:700,color:C.greyMid,letterSpacing:1,textTransform:"uppercase"}}>
+                {showAll ? `Wszystkie nadchodzące (${upcoming.length})` : `Nadchodzące (${Math.min(upcoming.length, LIST_LIMIT)}${upcoming.length > LIST_LIMIT ? `/${upcoming.length}` : ""})`}
+              </div>
+              {!showAll && upcoming.length > LIST_LIMIT && (
+                <button onClick={() => setShowAll(true)}
+                  style={{background:"none",border:"none",fontSize:11,color:C.greyMid,cursor:"pointer",textDecoration:"underline",padding:0}}>
+                  pokaż wszystkie
+                </button>
+              )}
+              {showAll && (
+                <button onClick={() => setShowAll(false)}
+                  style={{background:"none",border:"none",fontSize:11,color:C.greyMid,cursor:"pointer",textDecoration:"underline",padding:0}}>
+                  pokaż najbliższe
+                </button>
+              )}
             </div>
             {scheduled.length > 0 && (
               <button onClick={() => {
