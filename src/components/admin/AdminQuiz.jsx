@@ -4,8 +4,10 @@ import { TRAININGS } from "../../data/trainings";
 import { db } from "../../lib/supabase";
 import { Spinner } from "../SharedUI";
 import { useToast } from "../../lib/ToastContext";
+import { useUser } from "../../lib/UserContext";
 
-export function AdminQuiz({ token }) {
+export function AdminQuiz() {
+  const { token } = useUser();
   const [quizzes,      setQuizzes]      = useState([]);
   const [selQuiz,      setSelQuiz]      = useState(null);
   const [questions,    setQuestions]    = useState([]);
