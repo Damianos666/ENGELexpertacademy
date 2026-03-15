@@ -4,17 +4,19 @@ import { db } from "../lib/supabase";
 import { formatDate } from "../lib/helpers";
 import { Spinner, Toggle } from "./SharedUI";
 import { useT } from "../lib/LangContext";
+import { useUser } from "../lib/UserContext";
 
 const CONTACT_EMAIL = import.meta.env.VITE_CONTACT_EMAIL || "";
 const CONTACT_PHONE = import.meta.env.VITE_CONTACT_PHONE || "";
 
-export function MessagesTab({ token, userEmail, user }) {
+export function MessagesTab() {
   const T = useT();
-  const isAdmin = userEmail === ADMIN_EMAIL;
+  const { user, token } = useUser();
+  const isAdmin = user?.role === "admin" || user?.email === ADMIN_EMAIL;
 
   // Dane użytkownika wyciągnięte na poziomie komponentu
   const userName  = user?.displayName || user?.name  || "";
-  const userMail  = user?.email       || userEmail   || "";
+  const userMail  = user?.email       || "";
   const userRole  = user?.role        || "";
   const userFirma = user?.firma       || "";
   const [messages,  setMessages]  = useState([]);
