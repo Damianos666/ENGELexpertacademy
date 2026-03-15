@@ -2,8 +2,36 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { C, GROUPS, TRAINERS } from "../../lib/constants";
 import { TRAININGS } from "../../data/trainings";
 import { db } from "../../lib/supabase";
-import { Spinner } from "../SharedUI";
+import { Spinner, Toggle } from "../SharedUI";
 import { useToast } from "../../lib/ToastContext";
+
+/* ── Stałe i helpery terminarza ── */
+const MONTHS_PL = ["Styczeń","Luty","Marzec","Kwiecień","Maj","Czerwiec",
+                   "Lipiec","Sierpień","Wrzesień","Październik","Listopad","Grudzień"];
+const TIMELINE_TRAINERS = [1,2,3,4,5];
+
+const _EPOCH = new Date("2020-01-01T12:00:00");
+function _pad(n) { return String(n).padStart(2,"0"); }
+function _absDay(iso) { return Math.round((new Date(iso+"T12:00:00") - _EPOCH) / 86400000); }
+function _daysInMon(y, m) { return new Date(y, m+1, 0).getDate(); }
+function _shiftMonth({ year, month }, delta) {
+  let m = month + delta, y = year;
+  while (m > 11) { m -= 12; y++; }
+  while (m < 0)  { m += 12; y--; }
+  return { year: y, month: m };
+}
+function toISO(date) {
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
+}
+function parseDays(durationStr) {
+  const m = String(durationStr || "1").match(/(\d+)/);
+  return m ? parseInt(m[1]) : 1;
+}
+function addDays(isoDate, n) {
+  const d = new Date(isoDate + "T12:00:00");
+  d.setDate(d.getDate() + n);
+  return toISO(d);
+}
 
 export function AdminSchedule({ token }) {
   const { addToast } = useToast();
