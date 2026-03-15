@@ -161,7 +161,7 @@ export function ScheduleTab({ activeGroups }) {
 
         <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",marginBottom:4}}>
           {T.days_short.map((d, i) => (
-            <div key={d} style={{textAlign:"center",fontSize:9,fontWeight:700,color: i >= 5 ? "#E74C3C" : C.greyMid,padding:"2px 0",letterSpacing:.5}}>{d}</div>
+            <div key={d} style={{textAlign:"center",fontSize:9,fontWeight:700,color: C.greyMid,padding:"2px 0",letterSpacing:.5}}>{d}</div>
           ))}
         </div>
 
@@ -180,16 +180,16 @@ export function ScheduleTab({ activeGroups }) {
             let bg = "transparent";
             if (isSel)         bg = C.black;
             else if (isToday)  bg = C.greenBg;
-            else if (isDayOff) bg = "#FFF0EE";
+            else if (isDayOff) bg = "#f0f0f0";
 
-            const numColor = isSel ? C.white : isToday ? C.greenDk : isDayOff ? "#E74C3C" : C.greyDk;
+            const numColor = isSel ? C.white : isToday ? C.greenDk : isDayOff ? "#aaa" : C.greyDk;
 
             return (
               <button key={iso} onClick={() => setSelected(isSel ? null : iso)}
                 title={holidays[iso] || undefined}
                 style={{
                   background: bg,
-                  border: isToday && !isSel ? `1px solid ${C.green}` : isDayOff && !isSel ? "1px solid #FADBD8" : "1px solid transparent",
+                  border: isToday && !isSel ? `1px solid ${C.green}` : isDayOff && !isSel ? "1px solid #ddd" : "1px solid transparent",
                   borderRadius: 6,
                   padding: "5px 2px 3px",
                   cursor: groups.length ? "pointer" : "default",
@@ -226,8 +226,8 @@ export function ScheduleTab({ activeGroups }) {
             <span style={{fontSize:10,color:C.greyMid}}>Specjalne</span>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:4}}>
-            <div style={{width:8,height:8,borderRadius:2,background:"#FFF0EE",border:"1px solid #FADBD8"}}/>
-            <span style={{fontSize:10,color:"#E74C3C"}}>Weekend / Święto</span>
+            <div style={{width:8,height:8,borderRadius:2,background:"#f0f0f0",border:"1px solid #ddd"}}/>
+            <span style={{fontSize:10,color:C.greyMid}}>Weekend / Święto</span>
           </div>
         </div>
 
