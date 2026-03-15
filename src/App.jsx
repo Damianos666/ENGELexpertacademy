@@ -218,16 +218,23 @@ function AppRoot() {
     });
     try {
       const payload = {
-        user_id:       user.id,
-        training_id:   entry.training.id,
         training_data: entry.training,
         date:          entry.date,
         code_key:      entry.key,
         trainer:       entry.trainer || null,
       };
-      const res = await db.upsert(user.accessToken, "completions", payload, "user_id,training_id");
-      if (!res || res.length === 0) {
-        addToast("⚠️ Błąd zapisu: UPSERT nie zwrócił danych. Sprawdź RLS w Supabase — tabela completions wymaga polityki INSERT/UPDATE.", "warning");
+      // Najpierw próbuj update (jeśli rekord istnieje), potem insert
+      const updated = await db.update(
+        user.accessToken, "completions",
+        `user_id=eq.${user.id}&training_id=eq.${entry.training.id}`,
+        payload
+      );
+      if (!updated || updated.length === 0) {
+        await db.insert(user.accessToken, "completions", {
+          user_id:     user.id,
+          training_id: entry.training.id,
+          ...payload,
+        });
       }
     } catch(e) {
       logErr("[COMPLETE] ERROR saving:", e.message);
