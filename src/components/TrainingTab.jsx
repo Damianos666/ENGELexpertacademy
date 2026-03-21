@@ -213,7 +213,10 @@ export function TrainingTab({ completed, onComplete, activeGroups, loading }) {
   // Skaner QR — pełnoekranowa nakładka
   if (showScanner) return (
     <QRScannerTab
-      onComplete={entry => { onComplete(entry); setCelebEntry(entry); }}
+      onComplete={result => {
+        // Wzbogać dane szkolenia z lokalnego TRAININGS (tytuł, kategoria, czas trwania)
+        handleSuccess(result, result.key || "");
+      }}
       onClose={() => setShowScanner(false)}
     />
   );
