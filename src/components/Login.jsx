@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { C } from "../lib/constants";
 import { auth, db, session } from "../lib/supabase";
 import { generateLogin } from "../lib/helpers";
@@ -34,6 +34,10 @@ export function LoginScreen({ onLogin }) {
 
 const LS_REMEMBER_KEY = "eea_remember";
 
+// Maksymalna liczba nieudanych prób przed blokadą
+const MAX_ATTEMPTS = 3;
+const LOCKOUT_SECONDS = 30;
+
 export function AuthForm({ mode, setMode, onLogin }) {
   const T = useT();
   const [email,    setEmail]    = useState("");
@@ -46,7 +50,13 @@ export function AuthForm({ mode, setMode, onLogin }) {
   const [shake,    setShake]    = useState(false);
   const [loading,  setLoading]  = useState(false);
 
-  // Wczytaj preferencję checkboxa + email z zapisanej sesji
+  // NAPRAWA: Rate limiting po stronie klienta — blokada po MAX_ATTEMPTS nieudanych próbach.
+  // Nie zastępuje zabezpieczeń serwerowych, ale eliminuje najprostsze ataki słownikowe
+  // i podwójne kliknięcia przycisku.
+  const [attempts, setAttempts] = useState(0);
+  const [lockout,  setLockout]  = useState(0); // sekundy do odblokowania
+  const lockoutTimer = useRef(null);
+
   useEffect(() => {
     const savedRemember = localStorage.getItem(LS_REMEMBER_KEY) === "true";
     setRemember(savedRemember);
@@ -56,19 +66,35 @@ export function AuthForm({ mode, setMode, onLogin }) {
     }
   }, []);
 
+  // Wyczyść timer przy odmontowaniu
+  useEffect(() => () => { if (lockoutTimer.current) clearInterval(lockoutTimer.current); }, []);
+
+  function startLockout() {
+    let sec = LOCKOUT_SECONDS;
+    setLockout(sec);
+    lockoutTimer.current = setInterval(() => {
+      sec--;
+      setLockout(sec);
+      if (sec <= 0) {
+        clearInterval(lockoutTimer.current);
+        setAttempts(0);
+      }
+    }, 1000);
+  }
+
   function sw(m) { setMode(m); setErr(""); setInfo(""); }
   useEffect(() => {
     setGenLogin(name.trim().split(/\s+/).length >= 2 ? generateLogin(name) : "");
   }, [name]);
 
   async function doLogin() {
+    if (lockout > 0) return;
     if (!email.trim() || !pass) { setErr("Wypełnij wszystkie pola"); return; }
     setLoading(true); setErr("");
     try {
       const s = await auth.signIn(email.trim().toLowerCase(), pass);
 
       if (remember) {
-        // Zapisz pełną sesję — access_token + refresh_token
         localStorage.setItem(LS_REMEMBER_KEY, "true");
         session.save(s.access_token, s.refresh_token, s.user);
       } else {
@@ -76,6 +102,8 @@ export function AuthForm({ mode, setMode, onLogin }) {
         session.clear();
       }
 
+      // Udane logowanie — resetuj licznik prób
+      setAttempts(0);
       onLogin({
         id:          s.user.id,
         accessToken: s.access_token,
@@ -84,6 +112,13 @@ export function AuthForm({ mode, setMode, onLogin }) {
     } catch(e) {
       setErr(e.message || "Błąd logowania");
       setShake(true); setTimeout(() => setShake(false), 400);
+
+      // Zwiększ licznik i zablokuj po MAX_ATTEMPTS próbach
+      setAttempts(prev => {
+        const next = prev + 1;
+        if (next >= MAX_ATTEMPTS) startLockout();
+        return next;
+      });
     } finally { setLoading(false); }
   }
 
@@ -106,7 +141,7 @@ export function AuthForm({ mode, setMode, onLogin }) {
         active_groups: ["tech","ur","maszyny"],
         notif_reminder: true,
         notif_cert: true,
-      }).catch(() => {}); // profil może już istnieć — ignoruj duplikat
+      }).catch(() => {});
 
       setInfo("Konto utworzone! Możesz się teraz zalogować.");
       sw("login"); setEmail(email); setPass("");
@@ -120,6 +155,8 @@ export function AuthForm({ mode, setMode, onLogin }) {
     }
     finally { setLoading(false); }
   }
+
+  const isLocked = lockout > 0;
 
   return (
     <>
@@ -137,10 +174,10 @@ export function AuthForm({ mode, setMode, onLogin }) {
 
         {mode === "login" ? (
           <>
-            <Field label={T.email_label} type="email" value={email} onChange={v => { setEmail(v); setErr(""); }} placeholder="np. jan@firma.pl"/>
-            <Field label={T.password_label} type="password" value={pass} onChange={v => { setPass(v); setErr(""); }} placeholder="••••••"/>
+            {/* autoComplete="email" i "current-password" pozwalają menedżerom haseł działać */}
+            <Field label={T.email_label} type="email" value={email} onChange={v => { setEmail(v); setErr(""); }} placeholder="np. jan@firma.pl" autoComplete="email"/>
+            <Field label={T.password_label} type="password" value={pass} onChange={v => { setPass(v); setErr(""); }} placeholder="••••••" autoComplete="current-password"/>
 
-            {/* ── Checkbox T.login_btn === "Sign in" ? "Remember me" : "Zapamiętaj mnie" ── */}
             <label style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,cursor:"pointer",userSelect:"none"}}>
               <div onClick={() => setRemember(r => !r)} style={{
                 width:20, height:20, flexShrink:0,
@@ -159,8 +196,19 @@ export function AuthForm({ mode, setMode, onLogin }) {
             </label>
 
             {err && <div style={{color:C.red,fontSize:12,marginBottom:12}}>{err}</div>}
-            <button style={{width:"100%",background:loading?C.greyDk:C.black,border:"none",color:C.white,padding:15,fontSize:15,fontWeight:600,cursor:loading?"not-allowed":"pointer",marginBottom:12}}
-              onClick={doLogin} disabled={loading}>{loading ? T.logging_in : T.login_btn}</button>
+
+            {/* Komunikat blokady po zbyt wielu nieudanych próbach */}
+            {isLocked && (
+              <div style={{color:C.amber,fontSize:12,marginBottom:12,fontWeight:600}}>
+                ⚠ Zbyt wiele nieudanych prób. Poczekaj {lockout}s.
+              </div>
+            )}
+
+            <button
+              style={{width:"100%",background:isLocked||loading?C.greyDk:C.black,border:"none",color:C.white,padding:15,fontSize:15,fontWeight:600,cursor:isLocked||loading?"not-allowed":"pointer",marginBottom:12}}
+              onClick={doLogin} disabled={isLocked||loading}>
+              {isLocked ? `Zablokowano (${lockout}s)` : loading ? T.logging_in : T.login_btn}
+            </button>
             <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:C.greyMid}}>
               <span>Nie masz konta? <span style={{color:C.black,fontWeight:700,cursor:"pointer",textDecoration:"underline"}} onClick={() => sw("register")}>Zarejestruj się</span></span>
               <span style={{color:C.black,fontWeight:600,cursor:"pointer",textDecoration:"underline"}} onClick={() => setMode("recover")}>Zapomniałem hasła</span>
@@ -168,8 +216,9 @@ export function AuthForm({ mode, setMode, onLogin }) {
           </>
         ) : (
           <>
-            <Field label={T.email_label + " *"} type="email" value={email} onChange={v => { setEmail(v); setErr(""); }} placeholder="np. jan@firma.pl"/>
-            <Field label={T.password_label + " *"} type="password" value={pass} onChange={v => { setPass(v); setErr(""); }} placeholder="min. 6 znaków"/>
+            {/* autoComplete="new-password" przy rejestracji — przeglądarka zaproponuje silne hasło */}
+            <Field label={T.email_label + " *"} type="email" value={email} onChange={v => { setEmail(v); setErr(""); }} placeholder="np. jan@firma.pl" autoComplete="email"/>
+            <Field label={T.password_label + " *"} type="password" value={pass} onChange={v => { setPass(v); setErr(""); }} placeholder="min. 6 znaków" autoComplete="new-password"/>
             {err && <div style={{color:C.red,fontSize:12,marginBottom:12}}>{err}</div>}
             <button style={{width:"100%",background:loading?C.greyDk:C.black,border:"none",color:C.white,padding:15,fontSize:15,fontWeight:600,cursor:loading?"not-allowed":"pointer",marginBottom:12}}
               onClick={doRegister} disabled={loading}>{loading ? "Rejestracja..." : T.register}</button>
@@ -218,7 +267,7 @@ export function RecoverForm({ onBack }) {
             <div style={{fontSize:13,color:C.greyDk,lineHeight:1.6,marginBottom:20}}>
               Podaj adres e-mail podany podczas rejestracji. Wyślemy link do resetowania hasła.
             </div>
-            <Field label="E-MAIL" type="email" value={email} onChange={v => { setEmail(v); setErr(""); }} placeholder="np. jan@firma.pl"/>
+            <Field label="E-MAIL" type="email" value={email} onChange={v => { setEmail(v); setErr(""); }} placeholder="np. jan@firma.pl" autoComplete="email"/>
             {err && <div style={{color:C.red,fontSize:12,marginBottom:12}}>{err}</div>}
             <button style={{width:"100%",background:loading?C.greyDk:C.black,border:"none",color:C.white,padding:14,fontSize:14,fontWeight:600,cursor:loading?"not-allowed":"pointer"}}
               onClick={send} disabled={loading}>{loading ? T.sending : T.reset_btn}</button>
