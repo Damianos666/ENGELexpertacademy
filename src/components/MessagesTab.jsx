@@ -7,6 +7,7 @@ import { useT } from "../lib/LangContext";
 import { useUser } from "../lib/UserContext";
 import { getDailyTipFromCycle, getDailyTipQuestion, TIP_POINTS, calcNewStreak, isQuizDay, getWeekKey, getWeekQuestions, calcQuizPoints, getProgramInfo } from "../lib/gamification";
 import { WeeklyQuiz } from "./GramTab";
+import { QuizRewardModal } from "./QuizRewardModal";
 
 const CONTACT_EMAIL = import.meta.env.VITE_CONTACT_EMAIL || "";
 const CONTACT_PHONE = import.meta.env.VITE_CONTACT_PHONE || "";
@@ -208,7 +209,7 @@ function WeeklyQuizBanner({ token, userId, onConfirmed, devDateStr = null, onDev
           program_start_date: gd.program_start_date || today,
         }, "user_id");
       }
-      setResult(res);
+      setResult({ ...res, newPoints: (gd.points || 0) + (res.points || 0) });
       setQuizDone(true);
       if (isDevMode) {
         if (onDevQuizDone) onDevQuizDone();
@@ -226,22 +227,13 @@ function WeeklyQuizBanner({ token, userId, onConfirmed, devDateStr = null, onDev
   if (loading || !isQuizDay(programStart, devDateStr)) return null;
 
   // Quiz właśnie ukończony — pokaż wynik
-  if (result) return (
-    <div style={{ margin: "8px 12px 0", borderRadius: 12, overflow: "hidden", border: "0.5px solid rgba(0,0,0,0.15)", boxShadow: "0 4px 12px rgba(0,0,0,0.12)" }}>
-      <div style={{ background: "#262624", padding: "10px 14px", display: "flex", alignItems: "center", gap: 8, borderBottom: "0.5px solid rgba(0,0,0,0.15)" }}>
-        <span style={{ fontSize: 14 }}>📝</span>
-        <span style={{ fontSize: 11, fontWeight: 700, color: "#A0A0A0", letterSpacing: .5 }}>QUIZ TYGODNIOWY</span>
-        <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 700, color: "#6E9430", background: "#EAF3DE", padding: "2px 8px", borderRadius: 4 }}>⭐ +{result.points} pkt</span>
-      </div>
-      <div style={{ background: "#30302E", padding: "14px 16px", textAlign: "center" }}>
-        <div style={{ fontSize: 32, marginBottom: 6 }}>{result.points >= 50 ? "🏆" : result.points >= 30 ? "🥈" : "📚"}</div>
-        <div style={{ fontSize: 15, fontWeight: 700, color: "#FFFFFF" }}>Wynik: {result.pct}%</div>
-        <div style={{ fontSize: 12, color: "rgba(255,255,255,.5)", marginTop: 4 }}>
-          {result.correct} / {result.total} poprawnych · +{result.points} pkt
-        </div>
-      </div>
-    </div>
-  );
+if (result) return (
+  <QuizRewardModal
+    result={result}
+    totalPoints={result.newPoints}
+    onClose={() => setResult(null)}
+  />
+);
 
   // Quiz już wykonany w tym tygodniu
   if (quizDone) return (
