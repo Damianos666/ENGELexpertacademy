@@ -43,13 +43,36 @@ export const session = {
   setToken: (t) => { _memoryToken = t; },
 };
 
+/* ─── TIMEOUT HELPER ─────────────────────────────────────────────────────── */
+// POPRAWKA: Domyślny timeout 15 sekund na każdy request.
+// Bez tego przy słabym połączeniu lub problemach Supabase spinner kręci się
+// w nieskończoność i UI jest kompletnie zablokowany.
+// Auth (logowanie/refresh) dostaje 20s — serwer Auth może być wolniejszy.
+const DEFAULT_TIMEOUT_MS = 15_000; // 15s dla requestów DB
+const AUTH_TIMEOUT_MS    = 20_000; // 20s dla auth (signIn, refresh)
+
+function fetchWithTimeout(url, options, timeoutMs = DEFAULT_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...options, signal: controller.signal })
+    .then(r => { clearTimeout(timer); return r; })
+    .catch(e => {
+      clearTimeout(timer);
+      // AbortError → czytelny komunikat zamiast technicznego "The operation was aborted"
+      if (e.name === "AbortError") {
+        throw new Error("Serwer nie odpowiada. Sprawdź połączenie i spróbuj ponownie.");
+      }
+      throw e;
+    });
+}
+
 /* ─── AUTH ───────────────────────────────────────────────────────────────── */
 export const auth = {
   signUp: async (email, password) => {
-    const r = await fetch(`${SB_URL}/auth/v1/signup`, {
+    const r = await fetchWithTimeout(`${SB_URL}/auth/v1/signup`, {
       method: "POST", headers: authHeaders(),
       body: JSON.stringify({ email, password }),
-    });
+    }, AUTH_TIMEOUT_MS);
     const d = await r.json();
     if (!r.ok) throw new Error(d.msg || d.error_description || "Błąd rejestracji");
     return d;
@@ -59,11 +82,14 @@ export const auth = {
     if (!SB_URL) throw new Error("Błąd konfiguracji aplikacji — skontaktuj się z administratorem.");
     let r;
     try {
-      r = await fetch(`${SB_URL}/auth/v1/token?grant_type=password`, {
+      r = await fetchWithTimeout(`${SB_URL}/auth/v1/token?grant_type=password`, {
         method: "POST", headers: authHeaders(),
         body: JSON.stringify({ email, password }),
-      });
-    } catch {
+      }, AUTH_TIMEOUT_MS);
+    } catch(e) {
+      // fetchWithTimeout rzuca już czytelny błąd przy timeout/abort
+      // fetch() rzuca TypeError przy braku sieci
+      if (e.message.includes("Serwer nie odpowiada")) throw e;
       throw new Error("Brak połączenia z serwerem. Sprawdź internet lub spróbuj ponownie.");
     }
     const d = await r.json();
@@ -72,10 +98,10 @@ export const auth = {
   },
 
   refreshSession: async (refreshToken) => {
-    const r = await fetch(`${SB_URL}/auth/v1/token?grant_type=refresh_token`, {
+    const r = await fetchWithTimeout(`${SB_URL}/auth/v1/token?grant_type=refresh_token`, {
       method: "POST", headers: authHeaders(),
       body: JSON.stringify({ refresh_token: refreshToken }),
-    });
+    }, AUTH_TIMEOUT_MS);
     const d = await r.json();
     if (!r.ok) throw new Error(d.error_description || d.msg || "Sesja wygasła");
     return d;
@@ -83,16 +109,17 @@ export const auth = {
 
   signOut: async (token) => {
     session.clear();
+    // signOut nie dostaje timeout — nie blokuje UI, fire-and-forget
     await fetch(`${SB_URL}/auth/v1/logout`, {
       method: "POST", headers: authHeaders(token),
-    });
+    }).catch(() => {});
   },
 
   recover: async (email) => {
-    const r = await fetch(`${SB_URL}/auth/v1/recover`, {
+    const r = await fetchWithTimeout(`${SB_URL}/auth/v1/recover`, {
       method: "POST", headers: authHeaders(),
       body: JSON.stringify({ email }),
-    });
+    }, AUTH_TIMEOUT_MS);
     if (!r.ok) { const d = await r.json(); throw new Error(d.msg || "Błąd"); }
   },
 };
@@ -108,15 +135,14 @@ const isJwtExpired = (text) => {
   } catch { return false; }
 };
 
-// Wykonuje fetch, a jeśli odpowiedź to JWT expired — odświeża token i ponawia.
-// Zwraca zawsze gotowy Response (do dalszego .json() lub .text()).
+// Wykonuje fetch z timeoutem, a jeśli odpowiedź to JWT expired — odświeża token i ponawia.
 const fetchWithRefresh = async (url, options, token) => {
-  const r = await fetch(url, { ...options, headers: { ...options.headers } });
-  if (r.status !== 401) return r;                        // nie 401 → zwróć od razu
+  // POPRAWKA: fetchWithTimeout zamiast fetch — 15s limit na request DB
+  const r = await fetchWithTimeout(url, { ...options, headers: { ...options.headers } });
+  if (r.status !== 401) return r;
   const text = await r.text();
-  if (!isJwtExpired(text)) { throw new Error(text); }   // 401 ale nie JWT → rzuć błąd
+  if (!isJwtExpired(text)) { throw new Error(text); }
 
-  // JWT expired — odśwież token
   const saved = session.load();
   if (!saved?.refreshToken) throw new Error("Sesja wygasła. Zaloguj się ponownie.");
   let newToken;
@@ -129,8 +155,8 @@ const fetchWithRefresh = async (url, options, token) => {
     session.clear();
     throw new Error("Sesja wygasła. Zaloguj się ponownie.");
   }
-  // Ponów request z nowym tokenem
-  return fetch(url, {
+  // Ponów request z nowym tokenem (też z timeoutem)
+  return fetchWithTimeout(url, {
     ...options,
     headers: { ...options.headers, "Authorization": `Bearer ${newToken}` },
   });
@@ -193,32 +219,35 @@ export const db = {
 };
 
 /* ─── EDGE FUNCTIONS ─────────────────────────────────────────────────────── */
-// APP_URL — zmień tutaj jeśli domena aplikacji się zmieni
-// (musi być identyczna jak APP_URL w Supabase Edge Function Settings)
 export const APP_URL = import.meta.env.VITE_APP_URL || "https://engel-eea.vercel.app";
 
 const edgeFetch = async (token, fnName, body) => {
-  const r = await fetch(`${SB_URL}/functions/v1/${fnName}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`,
-      "apikey": SB_ANON,
-    },
-    body: JSON.stringify(body),
-  });
+  // Edge functions dostają osobny timeout — mogą być wolniejsze (cold start Deno)
+  const EDGE_TIMEOUT_MS = 25_000;
+  let r;
+  try {
+    r = await fetchWithTimeout(`${SB_URL}/functions/v1/${fnName}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+        "apikey": SB_ANON,
+      },
+      body: JSON.stringify(body),
+    }, EDGE_TIMEOUT_MS);
+  } catch(e) {
+    if (e.message.includes("Serwer nie odpowiada")) throw e;
+    throw new Error("Brak połączenia z serwerem.");
+  }
   const d = await r.json();
   if (!r.ok) throw new Error(d.error || "Błąd serwera");
   return d;
 };
 
 export const edge = {
-  // Trener/admin: generuje kod z podpisem HMAC → zwraca { code, verifyUrl }
   generateCode: (token, training_short, trainer_id, is_special = false, special_title = "") =>
     edgeFetch(token, "generate-training-code", { training_short, trainer_id, is_special, special_title }),
 
-  // Uczestnik: weryfikuje kod, zapisuje ukończenie → zwraca { success, training, date, trainer, trainerNum }
-  // special_title i special_days — opcjonalnie dla kodów ST
   verifyCode: (token, code, special_title, special_days) =>
     edgeFetch(token, "verify-training-code", { code, special_title, special_days }),
 };
