@@ -105,12 +105,8 @@ export function QRScannerTab({ onComplete, onClose }) {
       // Poczekaj chwilę żeby użytkownik zobaczył sukces, potem zamknij
       setTimeout(() => {
         onComplete({
-          training:   result.training,
-          date:       result.date,
-          key:        code.replace(/-/g, ""),
-          trainer:    result.trainer,
-          trainerNum: result.trainerNum,
-          savedByEdge: true,
+          ...result,
+          key: code.replace(/-/g, ""),
         });
         onClose();
       }, 1200);
