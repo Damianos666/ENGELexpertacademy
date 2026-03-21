@@ -200,7 +200,11 @@ export const APP_URL = import.meta.env.VITE_APP_URL || "https://engel-eea.vercel
 const edgeFetch = async (token, fnName, body) => {
   const r = await fetch(`${SB_URL}/functions/v1/${fnName}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+      "apikey": SB_ANON,
+    },
     body: JSON.stringify(body),
   });
   const d = await r.json();
