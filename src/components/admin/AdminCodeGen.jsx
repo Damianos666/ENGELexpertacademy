@@ -100,7 +100,7 @@ export function AdminCodeGen({ defaultTrainer }) {
               <input
                 value={specialTitle}
                 onChange={e => setSpecialTitle(e.target.value)}
-                placeholder="np. Spawanie TIG — poziom podstawowy"
+                placeholder="np. Szkolenie specjalne z obsługi"
                 style={{ width: "100%", padding: "11px 14px", fontSize: 13, border: `1.5px solid ${C.green}`, background: C.white, color: C.black, outline: "none", boxSizing: "border-box" }}
               />
               <div style={{ fontSize: 11, color: C.greyMid, marginTop: 5 }}>
@@ -166,10 +166,6 @@ export function AdminCodeGen({ defaultTrainer }) {
         </div>
       )}
 
-      <div style={{ background: "#EBF5FB", border: `1px solid ${C.blue}`, padding: "10px 14px", fontSize: 11, color: C.greyDk, lineHeight: 1.6 }}>
-        ℹ️ URL w QR: <strong>engel-eea.vercel.app</strong> — aby zmienić, ustaw <code>VITE_APP_URL</code> w Vercel
-        oraz <code>APP_URL</code> w Supabase → Edge Functions → Settings.
-      </div>
     </div>
   );
 }
