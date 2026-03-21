@@ -15,6 +15,7 @@ export function AdminCodeGen({ defaultTrainer }) {
   const [result,      setResult]      = useState(null);
   const [qrDataUrl,   setQrDataUrl]   = useState(null);
   const [copied,      setCopied]      = useState(false);
+  const [specialTitle, setSpecialTitle] = useState("");
 
   function handleGroupChange(gid) {
     setSelGroup(gid);
@@ -27,7 +28,7 @@ export function AdminCodeGen({ defaultTrainer }) {
     try {
       const training = TRAININGS.find(t => t.id === selTraining);
       const short    = mode === "special" ? "ST" : (training?.short || selTraining);
-      const data     = await edge.generateCode(token, short, selTrainer, mode === "special");
+      const data     = await edge.generateCode(token, short, selTrainer, mode === "special", specialTitle);
       setResult(data);
       const QRCode = await import("qrcode");
       const dataUrl = await QRCode.default.toDataURL(data.verifyUrl, {
@@ -63,7 +64,7 @@ export function AdminCodeGen({ defaultTrainer }) {
 
         <div style={{ display: "flex", gap: 0, marginBottom: 18, border: `1px solid ${C.grey}`, overflow: "hidden" }}>
           {[["normal", "📋 Standardowe"], ["special", "⭐ Specjalne (ST)"]].map(([val, label]) => (
-            <button key={val} onClick={() => { setMode(val); setResult(null); setQrDataUrl(null); }}
+            <button key={val} onClick={() => { setMode(val); setResult(null); setQrDataUrl(null); setSpecialTitle(""); }}
               style={{ flex: 1, padding: "9px 0", fontSize: 11, fontWeight: 700, cursor: "pointer", border: "none",
                 background: mode === val ? C.black : C.white, color: mode === val ? C.white : C.greyDk }}>
               {label}
@@ -91,9 +92,22 @@ export function AdminCodeGen({ defaultTrainer }) {
         )}
 
         {mode === "special" && (
-          <div style={{ marginBottom: 14, background: "#FEF3E2", border: `1px solid ${C.amber}`, padding: "10px 14px", fontSize: 11, color: C.greyDk, lineHeight: 1.6 }}>
-            ⭐ Kod ST — uczestnik sam wpisze nazwę szkolenia po zeskanowaniu.
-          </div>
+          <>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: C.greyDk, marginBottom: 8, letterSpacing: .5 }}>
+                KROK 1 — NAZWA SZKOLENIA *
+              </label>
+              <input
+                value={specialTitle}
+                onChange={e => setSpecialTitle(e.target.value)}
+                placeholder="np. Spawanie TIG — poziom podstawowy"
+                style={{ width: "100%", padding: "11px 14px", fontSize: 13, border: `1.5px solid ${C.green}`, background: C.white, color: C.black, outline: "none", boxSizing: "border-box" }}
+              />
+              <div style={{ fontSize: 11, color: C.greyMid, marginTop: 5 }}>
+                Nazwa zostanie zakodowana w QR — uczestnik nie musi jej wpisywać.
+              </div>
+            </div>
+          </>
         )}
 
         <div style={{ marginBottom: 18 }}>
