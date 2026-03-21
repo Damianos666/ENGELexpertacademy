@@ -69,13 +69,16 @@ export function QRScannerTab({ onComplete, onClose }) {
 
       if (result?.data) {
         const url = result.data;
-        // Wyciągnij kod z URL: .../verify/KOD lub sam tekst kodu
+        // Wyciągnij kod i opcjonalny tytuł z URL: .../verify/KOD?title=Nazwa
         const match = url.match(/\/verify\/([A-Z0-9-]+)/i);
         const code  = match ? match[1] : url;
+        const titleParam = url.includes("?title=")
+          ? decodeURIComponent(url.split("?title=")[1])
+          : "";
         if (code) {
           scanningRef.current = false;
           stopCamera();
-          verifyCode(code);
+          verifyCode(code, titleParam);
           return;
         }
       }
@@ -96,10 +99,10 @@ export function QRScannerTab({ onComplete, onClose }) {
     cancelAnimationFrame(rafRef.current);
   }
 
-  async function verifyCode(code) {
+  async function verifyCode(code, specialTitle = "") {
     setStatus("verifying");
     try {
-      const result = await edge.verifyCode(user.accessToken, code);
+      const result = await edge.verifyCode(user.accessToken, code, specialTitle || undefined);
       setStatus("success");
       if (navigator.vibrate) navigator.vibrate([60, 80, 120, 60, 200]);
       // Poczekaj chwilę żeby użytkownik zobaczył sukces, potem zamknij
