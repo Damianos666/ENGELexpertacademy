@@ -4,21 +4,8 @@ import { TRAININGS } from "../../data/trainings";
 import { db } from "../../lib/supabase";
 import { Spinner, Toggle } from "../SharedUI";
 import { useToast } from "../../lib/ToastContext";
+import { fetchHolidaysForYear } from "../../lib/holidays";
 
-async function fetchHolidaysForYear(year) {
-  const key = `eea_holidays_PL_${year}`;
-  try {
-    const cached = localStorage.getItem(key);
-    if (cached) return JSON.parse(cached);
-    const res = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/PL`);
-    if (!res.ok) return {};
-    const data = await res.json();
-    const map = {};
-    data.forEach(h => { map[h.date] = h.localName; });
-    localStorage.setItem(key, JSON.stringify(map));
-    return map;
-  } catch { return {}; }
-}
 /* ── Stałe i helpery terminarza ── */
 const MONTHS_PL = ["Styczeń","Luty","Marzec","Kwiecień","Maj","Czerwiec",
                    "Lipiec","Sierpień","Wrzesień","Październik","Listopad","Grudzień"];
