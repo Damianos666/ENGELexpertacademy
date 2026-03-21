@@ -4,24 +4,7 @@ import { TRAININGS } from "../data/trainings";
 import { db } from "../lib/supabase";
 import { useT } from "../lib/LangContext";
 import { useUser } from "../lib/UserContext";
-
-// ── Święta publiczne (PL) ─────────────────────────────────────────────────
-// Pobierane raz na rok z date.nager.at — bezpłatne API, bez klucza.
-// Cache w localStorage — żadnego pollingu, święta się nie zmieniają.
-async function fetchHolidaysForYear(year) {
-  const key = `eea_holidays_PL_${year}`;
-  try {
-    const cached = localStorage.getItem(key);
-    if (cached) return JSON.parse(cached);
-    const res = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/PL`);
-    if (!res.ok) return {};
-    const data = await res.json();
-    const map = {};
-    data.forEach(h => { map[h.date] = h.localName; });
-    localStorage.setItem(key, JSON.stringify(map));
-    return map;
-  } catch { return {}; }
-}
+import { fetchHolidaysForYear } from "../lib/holidays";
 
 function toISO(date) {
   return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
@@ -80,7 +63,6 @@ export function ScheduleTab({ activeGroups }) {
     load();
   }, [token]);
 
-  // Pobierz święta dla bieżącego i następnego roku przy starcie
   useEffect(() => {
     const thisYear = new Date().getFullYear();
     Promise.all([
@@ -89,7 +71,6 @@ export function ScheduleTab({ activeGroups }) {
     ]).then(([a, b]) => setHolidays({ ...a, ...b }));
   }, []);
 
-  // Jeśli użytkownik nawiguje do roku spoza cache — pobierz go
   useEffect(() => {
     const key = `eea_holidays_PL_${viewYear}`;
     if (!localStorage.getItem(key)) {
@@ -144,9 +125,8 @@ export function ScheduleTab({ activeGroups }) {
     else setViewMonth(m => m+1);
   }
 
-  // Swipe do zmiany miesiąca
   const touchStartX = useRef(null);
-  const SWIPE_THRESHOLD = 50; // px
+  const SWIPE_THRESHOLD = 50;
 
   const handleTouchStart = useCallback((e) => {
     touchStartX.current = e.touches[0].clientX;
@@ -157,8 +137,8 @@ export function ScheduleTab({ activeGroups }) {
     const dx = e.changedTouches[0].clientX - touchStartX.current;
     touchStartX.current = null;
     if (Math.abs(dx) < SWIPE_THRESHOLD) return;
-    if (dx < 0) nextMonth(); // swipe w lewo → następny miesiąc
-    else prevMonth();        // swipe w prawo → poprzedni miesiąc
+    if (dx < 0) nextMonth();
+    else prevMonth();
   }, [viewMonth, viewYear]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const todayStr = today();
