@@ -1,0 +1,43 @@
+// ─── Hasła motywujące po quizie tygodniowym ──────────────────────────────────
+// Edytuj swobodnie — wyświetlane zależnie od wyniku procentowego.
+// Każda kategoria: tablica stringów → losowany jeden przy każdym wyniku.
+
+export const QUIZ_MESSAGES = {
+  // wynik >= 90%
+  excellent: [
+    "Doskonały wynik! Jesteś ekspertem 🌟",
+    "Perfekcja! Wiedza przemawia przez Ciebie 🚀",
+    "Najlepszy wynik tygodnia — tak trzymaj! 🏆",
+  ],
+
+  // wynik >= 70%
+  good: [
+    "Świetna robota! Następnym razem może 90%?",
+    "Bardzo dobrze! Widać że czytasz tipy uważnie 📖",
+    "Solidny wynik — jesteś na dobrej drodze 💪",
+  ],
+
+  // wynik >= 50%
+  ok: [
+    "Dobry start! Czytaj tipy jeszcze uważniej 📖",
+    "Nieźle! Powtórz materiał i następnym razem będzie lepiej",
+    "50% to dobra baza — w górę od teraz! ⬆️",
+  ],
+
+  // wynik < 50%
+  low: [
+    "Powtórz tipy i spróbuj za tydzień 💪",
+    "Każdy błąd to lekcja — wróć silniejszy za 7 dni!",
+    "Nie poddawaj się — następny quiz będzie Twój! 🎯",
+  ],
+};
+
+// Pomocnicza funkcja — losuje jedno hasło z odpowiedniej kategorii
+export function getQuizMessage(pct) {
+  let msgs;
+  if (pct >= 90)      msgs = QUIZ_MESSAGES.excellent;
+  else if (pct >= 70) msgs = QUIZ_MESSAGES.good;
+  else if (pct >= 50) msgs = QUIZ_MESSAGES.ok;
+  else                msgs = QUIZ_MESSAGES.low;
+  return msgs[Math.floor(Math.random() * msgs.length)];
+}
