@@ -120,9 +120,9 @@ export function AdminCodeGen({ defaultTrainer }) {
           </select>
         </div>
 
-        <button onClick={generateCode} disabled={loading}
-          style={{ width: "100%", background: loading ? C.greyDk : C.black, border: "none", color: C.white,
-            padding: 14, fontSize: 14, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", marginBottom: 8 }}>
+        <button onClick={generateCode} disabled={loading || (mode === "special" && !specialTitle.trim())}
+          style={{ width: "100%", background: (loading || (mode === "special" && !specialTitle.trim())) ? C.greyDk : C.black, border: "none", color: C.white,
+            padding: 14, fontSize: 14, fontWeight: 700, cursor: (loading || (mode === "special" && !specialTitle.trim())) ? "not-allowed" : "pointer", marginBottom: 8 }}>
           {loading ? "Generuję..." : "🔑 Generuj kod QR"}
         </button>
 
