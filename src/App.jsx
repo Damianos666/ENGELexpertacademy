@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect, useRef, lazy, Suspense } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef, lazy, Suspense, Component } from "react";
 import { C, GROUPS } from "./lib/constants";
 import { auth, db, session, setOnTokenRefreshed } from "./lib/supabase";
 import { calcProgress } from "./lib/helpers";
@@ -15,12 +15,72 @@ import { MessagesTab } from "./components/MessagesTab";
 import { ProfileTab } from "./components/ProfileTab";
 import { TrainerScheduleTab } from "./components/TrainerScheduleTab";
 import { TabBar } from "./components/TabBar";
-import { GramTab } from "./components/GramTab";
+
+// POPRAWKA: GramTab lazy — nie trafia do głównego bundla, ładuje się tylko gdy otwarty
+const GramTab    = lazy(() => import("./components/GramTab").then(m => ({ default: m.GramTab })));
 
 // Lazy imports — AdminPanel (~400KB) i komponenty trenera ładują się tylko gdy potrzebne
 const AdminPanel   = lazy(() => import("./components/admin/AdminPanel").then(m => ({ default: m.AdminPanel })));
 const AdminCodeGen = lazy(() => import("./components/admin/AdminCodeGen").then(m => ({ default: m.AdminCodeGen })));
 const AdminQuiz    = lazy(() => import("./components/admin/AdminQuiz").then(m => ({ default: m.AdminQuiz })));
+
+// POPRAWKA: Error Boundary — łapie niesłowne błędy JS i pokazuje ekran błędu
+// zamiast białego ekranu. Klasa bo React Error Boundary wymaga komponentu klasowego.
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, info) {
+    // W produkcji logi są wyciszone przez logger.js — tu używamy console.error
+    // bo to krytyczny błąd który zawsze chcemy widzieć
+    console.error("[ErrorBoundary]", error, info?.componentStack);
+  }
+
+  render() {
+    if (!this.state.hasError) return this.props.children;
+
+    return (
+      <div style={{
+        height: "100%", display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "center",
+        background: "#EFEFEF", padding: 32, textAlign: "center",
+        fontFamily: "'Helvetica Neue',Helvetica,Arial,sans-serif",
+      }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
+        <div style={{ fontSize: 18, fontWeight: 700, color: "#1A1A1A", marginBottom: 8 }}>
+          Coś poszło nie tak
+        </div>
+        <div style={{ fontSize: 13, color: "#686868", lineHeight: 1.6, marginBottom: 24, maxWidth: 300 }}>
+          Wystąpił nieoczekiwany błąd. Odśwież stronę — jeśli problem się powtarza, skontaktuj się z administratorem.
+        </div>
+        <button
+          onClick={() => window.location.reload()}
+          style={{
+            background: "#1A1A1A", border: "none", color: "#fff",
+            padding: "12px 28px", fontSize: 14, fontWeight: 600,
+            cursor: "pointer", borderRadius: 6,
+          }}>
+          Odśwież stronę
+        </button>
+        {import.meta.env.DEV && this.state.error && (
+          <pre style={{
+            marginTop: 24, fontSize: 10, color: "#C0392B",
+            textAlign: "left", maxWidth: "100%", overflow: "auto",
+            background: "#FDEDEC", padding: 12, borderRadius: 4,
+          }}>
+            {this.state.error.toString()}
+          </pre>
+        )}
+      </div>
+    );
+  }
+}
 
 // OPTYMALIZACJA: Style wyciągnięte poza render — nowe obiekty NIE tworzą się co renderze.
 const styles = {
@@ -51,11 +111,15 @@ const TRAINER_TABS = [
 
 export default function App() {
   return (
-    <LangProvider>
-      <ToastProvider>
-        <AppRoot />
-      </ToastProvider>
-    </LangProvider>
+    // POPRAWKA: ErrorBoundary owija całą aplikację — biały ekran zastąpiony
+    // czytelnym komunikatem z przyciskiem "Odśwież stronę"
+    <ErrorBoundary>
+      <LangProvider>
+        <ToastProvider>
+          <AppRoot />
+        </ToastProvider>
+      </LangProvider>
+    </ErrorBoundary>
   );
 }
 
@@ -115,9 +179,6 @@ function AppRoot() {
     }
     requestNotifPermission();
     checkMessages(user.accessToken);
-
-    // NAPRAWA BUGU: Było 24 * 60 * 60_000 (24 GODZINY!) — wiadomości sprawdzane raz na dobę.
-    // Zmienione na 5 minut (300_000 ms). Dostosuj do potrzeb: 60_000 = 1 min, 300_000 = 5 min.
     pollInterval.current = setInterval(() => checkMessages(user.accessToken), 5 * 60_000);
     return () => { if (pollInterval.current) clearInterval(pollInterval.current); };
   }, [user, checkMessages]);
@@ -130,8 +191,6 @@ function AppRoot() {
     } catch(e) { logErr("[TRAINER VIEW] save error:", e.message); }
   }, [user]);
 
-  // Rejestruje callback który db._withRefresh() wywoła po odświeżeniu tokenu.
-  // Dzięki temu React state (user.accessToken) jest zawsze aktualny.
   useEffect(() => {
     setOnTokenRefreshed((newToken) => {
       session.setToken(newToken);
@@ -140,11 +199,8 @@ function AppRoot() {
     });
   }, []);
 
-  // Proaktywne odświeżanie tokenu co 50 minut.
-  // JWT Supabase wygasa po 60 min — odświeżamy z 10-minutowym zapasem,
-  // żeby żaden request nie trafił na wygasły token.
   const refreshTimerRef = useRef(null);
-  const TOKEN_REFRESH_INTERVAL = 50 * 60 * 1000; // 50 minut
+  const TOKEN_REFRESH_INTERVAL = 50 * 60 * 1000;
 
   const proactiveRefresh = useCallback(async () => {
     const saved = session.load();
@@ -169,7 +225,6 @@ function AppRoot() {
     return () => { if (refreshTimerRef.current) clearInterval(refreshTimerRef.current); };
   }, [user, proactiveRefresh]);
 
-  // Odtwórz sesję z localStorage przy starcie
   useEffect(() => {
     async function restoreSession() {
       const saved = session.load();
@@ -196,10 +251,6 @@ function AppRoot() {
     setDataLoading(true);
     try {
       log("[LOGIN] user.id =", rawUser.id);
-
-      // OPTYMALIZACJA: Oba requesty startują równolegle (Promise.all zamiast sekwencyjnie)
-      // Wcześniej: czekaliśmy na profile, potem completions → dwa roundtrips w szeregu.
-      // Teraz: oba lecą jednocześnie — czas logowania skraca się o ~50%.
       const [profiles, comps, overrides, gameRows] = await Promise.all([
         db.get(rawUser.accessToken, "profiles", `id=eq.${rawUser.id}&select=*`).catch(() => []),
         db.get(rawUser.accessToken, "completions", `user_id=eq.${rawUser.id}&order=created_at.asc&select=*`).catch(() => []),
@@ -208,7 +259,6 @@ function AppRoot() {
       ]);
 
       const profile = profiles[0] || null;
-
       const u = {
         id:           rawUser.id,
         email:        rawUser.email,
@@ -227,7 +277,6 @@ function AppRoot() {
       u.displayRole = u.role || "";
 
       setUserRaw(u);
-
       if (Array.isArray(u.active_groups) && u.active_groups.length)
         setActiveGroups(u.active_groups);
       setNotifReminder(u.notif_reminder);
@@ -269,7 +318,6 @@ function AppRoot() {
         code_key:      entry.key,
         trainer:       entry.trainer || null,
       };
-      // Najpierw próbuj update (jeśli rekord istnieje), potem insert
       const updated = await db.update(
         user.accessToken, "completions",
         `user_id=eq.${user.id}&training_id=eq.${entry.training.id}`,
@@ -290,8 +338,6 @@ function AppRoot() {
 
   const handleLogout = useCallback(async () => {
     try { await auth.signOut(user?.accessToken); } catch {}
-    // BEZPIECZEŃSTWO: czyścimy cache Service Workera przy wylogowaniu —
-    // dane API poprzedniego użytkownika nie zostają na urządzeniu.
     try { await caches.delete("supabase-api"); } catch {}
     localStorage.removeItem("eea_trainer_view");
     setUserRaw(null); setCompleted([]); setTab(0); setMsgCount(0);
@@ -308,7 +354,7 @@ function AppRoot() {
       setGramRefreshKey(k => k + 1);
     } catch {}
   }, [user]);
-  // Wcześniej wywoływany niezależnie w App, TrainingTab i ProfileTab = 3x ta sama praca.
+
   const progress = useMemo(
     () => calcProgress(completed, activeGroups),
     [completed, activeGroups]
@@ -319,8 +365,6 @@ function AppRoot() {
     [user?.displayRole, user?.firma]
   );
 
-  // BEZPIECZEŃSTWO + OPTYMALIZACJA: Wartość kontekstu memoizowana — nie powoduje
-  // re-renderów potomków przy każdej zmianie niepowiązanego stanu w AppRoot.
   const userContextValue = useMemo(() => ({
     user,
     token: user?.accessToken ?? null,
@@ -340,10 +384,7 @@ function AppRoot() {
 
   if (!user) return <LoginScreen onLogin={handleLogin}/>;
 
-  // BEZPIECZEŃSTWO: Rola "admin" pochodzi wyłącznie z kolumny `role` w tabeli `profiles`
-  // chronionej przez RLS. Email admina nie jest nigdzie w kodzie klienta.
   const isAdmin = user.role === "admin";
-
   const isTrainer     = user.trainer_id != null;
   const inTrainerView = isTrainer && trainerView === "trainer";
 
@@ -390,13 +431,11 @@ function AppRoot() {
 }
 
 /* ─── WIDOK TRENERA ──────────────────────────────────────────────────────── */
-// Wydzielony jako osobny komponent — AppRoot re-renderuje się rzadziej,
-// bo zmiany stanu specyficzne dla trenera nie dotyczą widoku klienta.
 function TrainerView({ tab, setTab, msgCount, completed, activeGroups, setActiveGroups, onLogout, trainerView, setTrainerView, bannerSub }) {
-  const { user, token } = useUser();  // token z kontekstu — bez prop drilling
+  const { user } = useUser();
 
   useEffect(() => {
-    const handler = () => setTab(2); // Wiadomości = tab 2 w widoku trenera
+    const handler = () => setTab(2);
     window.addEventListener("gram:goToMessages", handler);
     return () => window.removeEventListener("gram:goToMessages", handler);
   }, [setTab]);
@@ -411,9 +450,6 @@ function TrainerView({ tab, setTab, msgCount, completed, activeGroups, setActive
         <span style={styles.trainerBadge}>TRENER</span>
       </div>
       <div style={styles.trainerContent}>
-        {/* display:none zamiast conditional render — zachowuje stan zakładek */}
-        {/* NAPRAWA: tabVisible miało overflow:hidden + height:100% co blokowało scroll.
-            trainerContent już scrolluje — dzieci nie powinny ograniczać wysokości. */}
         <div style={tab === 0 ? {display:"flex",flexDirection:"column"} : {display:"none"}}>
           <TrainerScheduleTab trainerNum={user.trainer_id}/>
         </div>
@@ -456,6 +492,7 @@ function ClientView({ tab, setTab, completed, activeGroups, setActiveGroups, onL
     window.addEventListener("gram:goToMessages", handler);
     return () => window.removeEventListener("gram:goToMessages", handler);
   }, [setTab]);
+
   return (
     <div className="app-container" style={styles.appContainer}>
       <Header onLogout={onLogout}/>
@@ -498,12 +535,17 @@ function ClientView({ tab, setTab, completed, activeGroups, setActiveGroups, onL
         </div>
       </div>
       <TabBar tab={tab} setTab={setTab} completedCount={completed.length} msgCount={msgCount}/>
-      {showGram && <GramTab key={gramRefreshKey} onClose={() => setShowGram(false)} onGoToMessages={() => { setShowGram(false); setTab(3); }}/>}
+      {/* POPRAWKA: GramTab w Suspense — lazy import, spinner podczas ładowania */}
+      {showGram && (
+        <Suspense fallback={<div style={styles.suspenseFallback}><Spinner/></div>}>
+          <GramTab key={gramRefreshKey} onClose={() => setShowGram(false)} onGoToMessages={() => { setShowGram(false); setTab(3); }}/>
+        </Suspense>
+      )}
     </div>
   );
 }
+
 /* ─── TABBAR TRENERA ─────────────────────────────────────────────────────── */
-// Wydzielony żeby uniknąć re-renderu całego TrainerView przy zmianie zakładki.
 const tabBtnBase = { flex: 1, background: "none", border: "none", padding: "8px 2px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, cursor: "pointer", position: "relative" };
 
 function TrainerTabBar({ tab, setTab, msgCount }) {
