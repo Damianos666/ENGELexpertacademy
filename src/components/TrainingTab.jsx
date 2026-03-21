@@ -77,10 +77,10 @@ export function TrainingTab({ completed, onComplete, activeGroups, loading }) {
     const raw = code.trim().toUpperCase().replace(/-/g, "");
     if (raw.length < 8) { setStatus("invalid"); return; }
 
-    // Kod ST — pokaż modal do wpisania nazwy szkolenia, potem edge
+    // Kod ST — pokaż prosty modal potwierdzenia (tytuł nieznany przy ręcznym wpisaniu)
     if (raw.startsWith("ST")) {
       setConfirm({ rawCode: raw, isSpecial: true });
-      setConfirmName(""); setConfirmDays("1");
+      setConfirmDays("1");
       return;
     }
 
@@ -98,17 +98,12 @@ export function TrainingTab({ completed, onComplete, activeGroups, loading }) {
 
   async function submitConfirm() {
     if (!confirm) return;
-    if (confirm.isSpecial && !confirmName.trim()) return;
     setVerifying(true);
     try {
-      const result = await edge.verifyCode(
-        user.accessToken,
-        confirm.rawCode,
-        confirm.isSpecial ? confirmName.trim() : undefined,
-        confirm.isSpecial ? confirmDays : undefined,
-      );
+      // Przy ręcznym wpisaniu ST tytuł nie jest znany — Edge Function użyje "Szkolenie specjalne"
+      const result = await edge.verifyCode(user.accessToken, confirm.rawCode);
       handleSuccess(result, confirm.rawCode);
-      setConfirm(null); setConfirmName(""); setConfirmDays("");
+      setConfirm(null); setConfirmDays("");
     } catch (e) {
       setStatus("invalid");
       setConfirm(null);
@@ -123,56 +118,30 @@ export function TrainingTab({ completed, onComplete, activeGroups, loading }) {
     setConfirmDays("");
   }
 
-  const canSubmit = confirm && (!confirm.isSpecial || (confirmName.trim() && confirmDays.trim()));
+  const canSubmit = !!confirm;
 
-  // Modal potwierdzenia — tylko dla kodów ST (wpisanie nazwy szkolenia)
+  // Modal potwierdzenia — tylko dla kodów ST wpisanych ręcznie
   const confirmModal = confirm && (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.65)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,padding:16,fontFamily:"'Helvetica Neue',Helvetica,Arial,sans-serif"}}>
       <div style={{background:C.white,width:"100%",maxWidth:380,borderRadius:12,boxShadow:"0 20px 60px rgba(0,0,0,.35)",overflow:"hidden"}}>
-
-        {/* Header */}
         <div style={{background:C.darkHdr,padding:"14px 20px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
           <span style={{color:C.white,fontSize:13,fontWeight:700,letterSpacing:1}}>{T.special_training}</span>
-          <button onClick={() => { setConfirm(null); setConfirmName(""); setConfirmDays(""); }}
+          <button onClick={() => { setConfirm(null); }}
             style={{background:"none",border:"none",color:"#fff",fontSize:18,cursor:"pointer",opacity:.7}}>✕</button>
         </div>
         <div style={{height:3,background:C.green}}/>
-
-        <div style={{padding:20,display:"flex",flexDirection:"column",gap:14}}>
-          <div>
-            <label style={{display:"block",fontSize:11,fontWeight:700,color:C.greyDk,marginBottom:6,letterSpacing:.5}}>NAZWA SZKOLENIA *</label>
-            <input
-              autoFocus
-              style={{width:"100%",border:`1.5px solid ${C.green}`,padding:"10px 14px",fontSize:14,color:C.black,outline:"none",boxSizing:"border-box",borderRadius:4}}
-              placeholder={T.enter_name_ph}
-              value={confirmName}
-              onChange={e => setConfirmName(e.target.value)}
-              onKeyDown={e => e.key==="Enter" && document.getElementById("confirmDaysInput")?.focus()}
-            />
-          </div>
-          <div>
-            <label style={{display:"block",fontSize:11,fontWeight:700,color:C.greyDk,marginBottom:6,letterSpacing:.5}}>{T.duration_label}</label>
-            <div style={{display:"flex",alignItems:"center",gap:10}}>
-              <input
-                id="confirmDaysInput"
-                type="number" min="1" max="99"
-                style={{width:64,border:`1.5px solid ${C.grey}`,padding:"10px 12px",fontSize:18,fontWeight:700,color:C.black,outline:"none",borderRadius:4,textAlign:"center"}}
-                value={confirmDays}
-                onChange={e => setConfirmDays(e.target.value)}
-                onKeyDown={e => e.key==="Enter" && canSubmit && submitConfirm()}
-              />
-              <span style={{fontSize:14,color:C.greyDk,fontWeight:600}}>{T.days_unit}</span>
-            </div>
+        <div style={{padding:20}}>
+          <div style={{background:C.greyBg,padding:"12px 14px",borderLeft:`3px solid ${C.amber}`,fontSize:13,color:C.greyDk,lineHeight:1.6}}>
+            ⭐ Szkolenie specjalne — nazwa zostanie pobrana z serwera.
           </div>
         </div>
-
         <div style={{padding:"0 20px 20px",display:"flex",gap:10}}>
-          <button onClick={() => { setConfirm(null); setConfirmName(""); setConfirmDays(""); }}
+          <button onClick={() => setConfirm(null)}
             style={{flex:1,background:"none",border:`1px solid ${C.grey}`,color:C.greyDk,padding:"11px 0",fontSize:13,fontWeight:600,cursor:"pointer",borderRadius:4}}>
             Anuluj
           </button>
-          <button onClick={submitConfirm} disabled={!canSubmit || verifying}
-            style={{flex:2,background:canSubmit?C.green:"#ccc",border:"none",color:C.white,padding:"11px 0",fontSize:13,fontWeight:700,cursor:canSubmit?"pointer":"not-allowed",borderRadius:4}}>
+          <button onClick={submitConfirm} disabled={verifying}
+            style={{flex:2,background:C.green,border:"none",color:C.white,padding:"11px 0",fontSize:13,fontWeight:700,cursor:verifying?"not-allowed":"pointer",borderRadius:4}}>
             {verifying ? "Weryfikuję..." : "Zatwierdź"}
           </button>
         </div>
