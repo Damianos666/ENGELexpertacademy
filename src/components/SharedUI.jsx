@@ -61,13 +61,19 @@ export function Toggle({ value, onChange, color }) {
 export function SecTitle({ children }) {
   return <div style={{padding:"14px 18px",borderBottom:`1px solid ${C.grey}`,fontSize:12,fontWeight:700,letterSpacing:1,color:C.greyDk,textTransform:"uppercase"}}>{children}</div>;
 }
-export function Field({ label, value, onChange, type="text", placeholder="", note, readOnly, green }) {
+
+// NAPRAWA: autoComplete przyjmowany jako prop zamiast hardkodowanego "off".
+// Poprawne wartości: "email", "current-password", "new-password", "off", undefined.
+// Menedżery haseł (1Password, Bitwarden, Chrome) działają tylko gdy autoComplete
+// ma właściwą wartość — "off" blokuje autouzupełnianie i zmusza do słabych haseł.
+export function Field({ label, value, onChange, type="text", placeholder="", note, readOnly, green, autoComplete }) {
   return (
     <div style={{marginBottom:16}}>
       <label style={{display:"block",fontSize:11,fontWeight:700,color:C.greyDk,marginBottom:6,letterSpacing:.5}}>{label}</label>
       <input readOnly={readOnly}
         style={{width:"100%",border:"none",borderBottom:`2px solid ${green?C.green:readOnly?"#ccc":C.grey}`,padding:"10px 0",fontSize:15,color:readOnly?C.greyMid:C.black,outline:"none",boxSizing:"border-box",background:readOnly?"#f7f7f7":"transparent",cursor:readOnly?"default":"text"}}
-        type={type} value={value} placeholder={placeholder} autoComplete="off"
+        type={type} value={value} placeholder={placeholder}
+        autoComplete={autoComplete || (readOnly ? "off" : undefined)}
         onChange={e => onChange && onChange(e.target.value)}/>
       {note && <div style={{fontSize:11,color:C.greyMid,marginTop:4}}>{note}</div>}
     </div>
