@@ -8,6 +8,8 @@
     <meta name="apple-mobile-web-app-title" content="ENGEL Expert Academy" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="theme-color" content="#2C2C2C" />
+    <link rel="preconnect" href="https://pjcraotvldzihczfmtps.supabase.co" crossorigin/>
+    <link rel="dns-prefetch" href="https://pjcraotvldzihczfmtps.supabase.co"/>
     <link rel="apple-touch-icon" href="/pwa-192.png" />
     <link rel="icon" type="image/png" href="/logo.png" />
     <title>ENGEL expert academy</title>
@@ -20,11 +22,6 @@
         overflow: hidden;
       }
 
-      /*
-        Desktop — tylko prawdziwy desktop/tablet, min-width: 1025px.
-        Poprzednio było 769px — przez co iPhone 16e w landscape (852px szerokości)
-        wpadał w "desktop mode" i dostawał ramkę 390px zamiast pełnego ekranu.
-      */
       @media (min-width: 1025px) {
         html, body {
           width: 100vw;
@@ -38,21 +35,18 @@
           align-items: center;
           justify-content: center;
         }
-        /* Domyślny kontener — widok klienta / trenera (format telefonu) */
         .app-container {
           width: 390px !important;
           height: 90vh !important;
           max-height: 844px !important;
           box-shadow: 0 8px 40px rgba(0,0,0,0.25) !important;
         }
-        /* Admin na desktopie — szeroki landscape */
         .app-container.admin-desktop {
           width: min(96vw, 1200px) !important;
           height: 90vh !important;
           max-height: 90vh !important;
           box-shadow: 0 8px 40px rgba(0,0,0,0.25) !important;
         }
-        /* Sidebar admin — lewa kolumna + prawa treść */
         .admin-layout {
           display: flex !important;
           flex-direction: row !important;
@@ -103,17 +97,11 @@
           display: flex !important;
           flex-direction: column !important;
         }
-        /* Na desktopie ukryj górny pasek zakładek admina */
         .admin-top-tabs {
           display: none !important;
         }
       }
 
-      /*
-        Mobile — portrait i landscape, do 1024px (pokrywa wszystkie telefony).
-        Wymiary TYLKO przez --app-width / --app-height ustawiane przez JS.
-        Jednostki vw/vh/dvh celowo pominięte — na iOS PWA nie aktualizują się po obrocie.
-      */
       @media (max-width: 1024px) {
         html {
           width:  var(--app-width);
@@ -198,8 +186,6 @@
       }
 
       setAppSize();
-      // iOS PWA przy starcie raportuje błędną wysokość zanim viewport się ustabilizuje.
-      // Te same opóźnienia co przy obrocie — rozwiązują identyczny problem ze szarym paskiem.
       setTimeout(setAppSize, 50);
       setTimeout(setAppSize, 200);
       setTimeout(setAppSize, 500);
