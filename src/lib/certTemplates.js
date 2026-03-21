@@ -5,6 +5,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { SB_URL, authHeaders } from "./supabase";
+import { err as logErr } from "./logger";
 
 const BUCKET = "cert-templates";
 
@@ -30,7 +31,7 @@ export async function fetchCertTemplateAsBase64(trainerNum, token) {
       }
     );
     if (!signRes.ok) {
-      console.error(`[certTemplates] Nie udało się wygenerować signed URL (${signRes.status}) — sprawdź policy bucketu`);
+      logErr(`[certTemplates] Nie udało się wygenerować signed URL (${signRes.status})`);
       return null;
     }
     const { signedURL } = await signRes.json();
@@ -39,7 +40,7 @@ export async function fetchCertTemplateAsBase64(trainerNum, token) {
     const fullSignedURL = signedURL.startsWith("/storage/v1") ? `${SB_URL}${signedURL}` : `${SB_URL}/storage/v1${signedURL}`;
     const imgRes = await fetch(fullSignedURL);
     if (!imgRes.ok) {
-      console.error(`[certTemplates] Błąd pobierania pliku przez signed URL (${imgRes.status})`);
+      logErr(`[certTemplates] Błąd pobierania pliku przez signed URL (${imgRes.status})`);
       return null;
     }
 
@@ -53,7 +54,7 @@ export async function fetchCertTemplateAsBase64(trainerNum, token) {
     });
 
   } catch (err) {
-    console.error(`[certTemplates] Wyjątek dla trenera ${trainerNum}:`, err);
+    logErr(`[certTemplates] Wyjątek dla trenera ${trainerNum}:`, err);
     return null;
   }
 }
