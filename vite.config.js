@@ -39,7 +39,7 @@ export default defineConfig(({ mode }) => {
         workbox: {
           skipWaiting: true,
           clientsClaim: true,
-          globPatterns: ['**/*.{js,css,html,png,svg,ico}'],
+          globPatterns: ['**/*.{js,css,html,png,svg,ico,ttf,woff2}'],
           globIgnores: ['version.json'],
           maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
           runtimeCaching: [
@@ -48,8 +48,6 @@ export default defineConfig(({ mode }) => {
               handler: 'NetworkFirst',
               options: {
                 cacheName: 'supabase-api',
-                // BEZPIECZEŃSTWO: 5 minut zamiast 24h — przy współdzielonym urządzeniu
-                // następny użytkownik nie zobaczy danych poprzedniego po wylogowaniu.
                 expiration: { maxEntries: 50, maxAgeSeconds: 5 * 60 },
               },
             },
@@ -61,8 +59,6 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks: {
-            // Każda z tych bibliotek trafia do osobnego chunk'a
-            // ładowanego lazy — nie blokuje pierwszego render'u
             'react-vendor':   ['react', 'react-dom'],
             'react-pdf':      ['@react-pdf/renderer'],
           },
