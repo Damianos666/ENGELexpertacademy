@@ -7,6 +7,7 @@ import {
   PROG_LEVELS, getLevelInfo, getEarnedBadges,
   calcQuizPoints, QUIZ_DURATION,
 } from "../lib/gamification";
+import { QuizRewardModal } from "./QuizRewardModal";
 
 /* ─── Pomocniki ──────────────────────────────────────────────────────────── */
 const toISO = (d = new Date()) => d.toISOString().slice(0, 10);
@@ -68,53 +69,17 @@ export function WeeklyQuiz({ questions, onResult }) {
   const secs = timeLeft % 60;
 
   /* Wynik końcowy */
-  if (phase === "result") {
-    const correct = questions.filter(q => answers[q.id] === q.correct).length;
-    const { pct, points, basePoints, timeBonus } = calcQuizPoints(correct, questions.length, timeLeft);
-    return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        <div style={{ textAlign: "center", padding: "8px 0" }}>
-          <div style={{ fontSize: 52, marginBottom: 8 }}>
-            {points >= 80 ? "🏆" : points >= 60 ? "🥈" : points >= 30 ? "🥉" : "📚"}
-          </div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: C.black }}>Quiz tygodniowy</div>
-          <div style={{ fontSize: 13, color: C.greyMid, marginTop: 4 }}>Wynik: {pct}%</div>
-        </div>
-        <div style={{ background: C.black, borderRadius: 12, padding: 20, textAlign: "center" }}>
-          <div style={{ fontSize: 11, color: "rgba(255,255,255,.4)", letterSpacing: .5, marginBottom: 6, fontWeight: 700 }}>
-            ZDOBYTE PUNKTY
-          </div>
-          <div style={{ fontSize: 52, fontWeight: 900, color: points > 0 ? C.green : C.greyMid, lineHeight: 1 }}>
-            +{points}
-          </div>
-          <div style={{ fontSize: 13, color: "rgba(255,255,255,.4)", marginTop: 6 }}>
-            {correct} / {questions.length} poprawnych · {pct}%
-          </div>
-          {/* Rozbicie punktów */}
-          <div style={{ marginTop: 12, display: "flex", gap: 8, justifyContent: "center" }}>
-            <div style={{ background: "rgba(255,255,255,.07)", borderRadius: 8, padding: "8px 14px", textAlign: "center" }}>
-              <div style={{ fontSize: 18, fontWeight: 800, color: C.green }}>+{basePoints}</div>
-              <div style={{ fontSize: 10, color: "rgba(255,255,255,.35)", marginTop: 2 }}>za odpowiedzi</div>
-            </div>
-            <div style={{ background: timeBonus > 0 ? "rgba(138,183,62,.15)" : "rgba(255,255,255,.04)", border: `1px solid ${timeBonus > 0 ? C.green : "transparent"}`, borderRadius: 8, padding: "8px 14px", textAlign: "center" }}>
-              <div style={{ fontSize: 18, fontWeight: 800, color: timeBonus > 0 ? C.green : "rgba(255,255,255,.2)" }}>+{timeBonus}</div>
-              <div style={{ fontSize: 10, color: "rgba(255,255,255,.35)", marginTop: 2 }}>bonus czasowy</div>
-            </div>
-          </div>
-        </div>
-        <div style={{ background: C.white, borderRadius: 8, padding: "12px 16px", fontSize: 13, color: C.greyDk, textAlign: "center", lineHeight: 1.5 }}>
-          {pct >= 90 ? "Doskonały wynik! Jesteś ekspertem 🌟" :
-           pct >= 70 ? "Świetna robota! Następnym razem może 90%?" :
-           pct >= 50 ? "Dobry start! Czytaj tipy uważniej 📖" :
-           "Powtórz tipy i spróbuj za tydzień 💪"}
-        </div>
-        <button onClick={() => onResult({ pct, points, basePoints, timeBonus, correct, total: questions.length })}
-          style={{ padding: "14px", background: C.green, border: "none", borderRadius: 10, color: C.white, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
-          Zapisz wynik →
-        </button>
-      </div>
-    );
-  }
+if (phase === "result") {
+  const correct = questions.filter(q => answers[q.id] === q.correct).length;
+  const { pct, points, basePoints, timeBonus } = calcQuizPoints(correct, questions.length, timeLeft);
+  return (
+    <QuizRewardModal
+      result={{ pct, points, basePoints, timeBonus, correct, total: questions.length }}
+      totalPoints={points}
+      onClose={() => onResult({ pct, points, basePoints, timeBonus, correct, total: questions.length })}
+    />
+  );
+}
 
   if (!currentQ) return null;
   const ANSWER_COLORS = { a: "#2980B9", b: "#8E44AD", c: "#E67E22" };
