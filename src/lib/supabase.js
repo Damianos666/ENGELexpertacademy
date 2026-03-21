@@ -214,8 +214,8 @@ const edgeFetch = async (token, fnName, body) => {
 
 export const edge = {
   // Trener/admin: generuje kod z podpisem HMAC → zwraca { code, verifyUrl }
-  generateCode: (token, training_short, trainer_id, is_special = false) =>
-    edgeFetch(token, "generate-training-code", { training_short, trainer_id, is_special }),
+  generateCode: (token, training_short, trainer_id, is_special = false, special_title = "") =>
+    edgeFetch(token, "generate-training-code", { training_short, trainer_id, is_special, special_title }),
 
   // Uczestnik: weryfikuje kod, zapisuje ukończenie → zwraca { success, training, date, trainer, trainerNum }
   // special_title i special_days — opcjonalnie dla kodów ST
