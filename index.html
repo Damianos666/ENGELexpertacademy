@@ -14,17 +14,11 @@
     <title>ENGEL expert academy</title>
 
 ```
-<!--
-  Synchroniczny skrypt — musi byc PRZED style zeby --safe-bottom bylo gotowe.
-  Ustawia zmienna CSS --safe-bottom na podstawie detekcji urzadzenia.
-  Nie uzywamy env() bo iOS zwraca 0 przy pierwszym renderze PWA.
--->
+<!-- Synchronicznie ustawia --safe-bottom zanim CSS sie wyrenderuje -->
 <script>
   (function() {
     var isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
     var isStandalone = window.navigator.standalone === true;
-    // iPhone z home indicator ma screen.height >= 812 (iPhone X wzwyz).
-    // iPhone SE / 8 / 7 / 6: screen.height <= 667. Prog 750 jest bezpieczny.
     var hasHomeIndicator = isIOS && isStandalone && window.screen.height >= 750;
     document.documentElement.style.setProperty('--safe-bottom', hasHomeIndicator ? '34px' : '0px');
   })();
@@ -34,7 +28,7 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   html, body {
-    /* Bialy zamiast #EFEFEF — strefa home indicator nie pokazuje szarego paska */
+    /* Bialy zamiast #EFEFEF — eliminuje szary pasek w strefie home indicator */
     background: #ffffff;
     overscroll-behavior: none;
     overflow: hidden;
@@ -115,7 +109,15 @@
   }
 
   @media (max-width: 1024px) {
-    html, body, #root {
+    html {
+      width:  var(--app-width);
+      height: var(--app-height);
+    }
+    body {
+      width:  var(--app-width);
+      height: var(--app-height);
+    }
+    #root {
       width:  var(--app-width);
       height: var(--app-height);
       overflow: hidden;
@@ -129,10 +131,7 @@
     }
     .app-content { -webkit-overflow-scrolling: touch; }
 
-    /*
-      Tabbar: fixed na dole, padding-bottom = --safe-bottom (0 lub 34px).
-      Biale tlo przykrywa stref home indicator bez zadnej zaleznosci od env().
-    */
+    /* --safe-bottom ustawione przez JS w <head> — zawsze poprawne od 1. renderu */
     .tabbar {
       position: fixed !important;
       bottom: 0; left: 0; right: 0;
@@ -187,9 +186,6 @@
       h = window.innerHeight;
     }
 
-    // UWAGA: NIE odejmujemy safe-bottom od h.
-    // visualViewport.height na iOS PWA juz uwzglednia ograniczenia viewportu.
-    // Tabbar jest position:fixed i sam obsluguje swoj padding-bottom.
     document.documentElement.style.setProperty('--app-width',  w + 'px');
     document.documentElement.style.setProperty('--app-height', h + 'px');
 
