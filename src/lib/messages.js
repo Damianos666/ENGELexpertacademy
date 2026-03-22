@@ -69,3 +69,24 @@ export function getQuizMessage(pct) {
   else                msgs = QUIZ_MESSAGES.low;
   return msgs[Math.floor(Math.random() * msgs.length)];
 }
+
+// ─── Hasła motywujące po potwierdzeniu Tipa dnia ─────────────────────────────
+// Edytuj swobodnie — losowane przy każdym potwierdzeniu.
+
+export const TIP_MESSAGES = [
+  "Wiedza rośnie krok po kroku. Dobra robota! 💡",
+  "Kolejny tip zaliczony — streak się kręci! 🔥",
+  "Codzienność buduje ekspertów. Tak trzymaj! 💪",
+  "Mały krok każdego dnia = wielki postęp! 🚀",
+  "Brawo! Jutro kolejna dawka wiedzy czeka 📖",
+  "Systematyczność to klucz do mistrzostwa 🏆",
+  "Każdy tip to cegiełka w budowaniu wiedzy 🧱",
+  "Konsekwencja procentuje — świetna robota! 📈",
+  "Ekspert w akcji! Tak trzymaj 🎯",
+  "Kolejny dzień, kolejny krok do przodu ⬆️",
+];
+
+// Losuje jedno hasło motywujące po tipie
+export function getTipMessage() {
+  return TIP_MESSAGES[Math.floor(Math.random() * TIP_MESSAGES.length)];
+}
