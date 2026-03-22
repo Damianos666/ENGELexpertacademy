@@ -266,6 +266,7 @@ function AppRoot() {
         name:         profile?.name          || rawUser.name         || rawUser.email,
         login:        profile?.login         || rawUser.login        || rawUser.email,
         role:         profile?.role          || rawUser.role         || null,
+        stanowisko:   profile?.stanowisko    || rawUser.stanowisko   || null,
         firma:        profile?.firma         || rawUser.firma        || null,
         active_groups: profile?.active_groups || rawUser.active_groups || ["tech","ur","maszyny"],
         notif_reminder: profile?.notif_reminder ?? rawUser.notif_reminder ?? true,
@@ -274,7 +275,7 @@ function AppRoot() {
         trainer_view:   profile?.trainer_view    ?? "client",
       };
       u.displayName = u.name;
-      u.displayRole = u.role || "";
+      u.displayRole = u.stanowisko || "";
 
       setUserRaw(u);
       if (Array.isArray(u.active_groups) && u.active_groups.length)
@@ -361,8 +362,8 @@ function AppRoot() {
   );
 
   const bannerSub = useMemo(
-    () => [user?.displayRole, user?.firma].filter(Boolean).join(" · "),
-    [user?.displayRole, user?.firma]
+    () => [user?.stanowisko, user?.firma].filter(Boolean).join(" · "),
+    [user?.stanowisko, user?.firma]
   );
 
   const userContextValue = useMemo(() => ({
