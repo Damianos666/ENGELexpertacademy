@@ -1,6 +1,6 @@
 import { useState, useEffect, memo } from "react";
 import { C, MSG_TYPES, DEV_PANEL_ENABLED } from "../lib/constants";
-import { db, edge } from "../lib/supabase";
+import { db, rpc } from "../lib/supabase";
 import { formatDate } from "../lib/helpers";
 import { Spinner, Toggle } from "./SharedUI";
 import { useT } from "../lib/LangContext";
@@ -61,10 +61,10 @@ function TipBanner({ token, userId, onConfirmed, devDateStr = null, onDevSeen, c
     try {
       // W trybie symulacji tylko lokalnie oznaczamy jako potwierdzone — bez zapisu do bazy
       if (!isDevMode) {
-        const res = await edge.saveResult(token, {
-          action:     "tip",
-          today,
-          questionId: tipQ.id,
+        const res = await rpc.saveResult(token, {
+          p_action:      "tip",
+          p_today:       today,
+          p_question_id: tipQ.id,
         });
         if (onConfirmed) onConfirmed();
         setTipModal({ totalPoints: res.total_points, streak: res.streak });
@@ -199,14 +199,14 @@ function WeeklyQuizBanner({ token, userId, onConfirmed, devDateStr = null, onDev
       // W trybie symulacji nie dodajemy punktów do prawdziwego konta
       if (!isDevMode) {
         const { week, year } = getWeekKey();
-        const serverRes = await edge.saveResult(token, {
-          action:       "quiz",
-          today,
-          correctCount: res.correct,
-          totalCount:   res.total,
-          timeBonus:    res.timeBonus,
-          weekYear:     year,
-          weekNumber:   week,
+        const serverRes = await rpc.saveResult(token, {
+          p_action:      "quiz",
+          p_today:       today,
+          p_correct:     res.correct,
+          p_total:       res.total,
+          p_time_bonus:  res.timeBonus,
+          p_week_year:   year,
+          p_week_number: week,
         });
         setResult({ ...res, newPoints: serverRes.total_points });
       } else {
