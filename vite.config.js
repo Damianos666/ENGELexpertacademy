@@ -23,7 +23,7 @@ export default defineConfig(({ mode }) => {
         includeAssets: ['logo.png', 'pwa-192.png', 'pwa-512.png'],
         manifest: {
           name: 'ENGEL Expert Academy',
-          short_name: 'ENGEL Expert Academy',
+          short_name: 'Expert Academy',
           description: 'Aplikacja szkoleń ENGEL Expert Academy',
           theme_color: '#2C2C2C',
           background_color: '#EFEFEF',
