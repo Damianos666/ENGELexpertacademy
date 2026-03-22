@@ -185,7 +185,7 @@ function AppRoot() {
 
   const setTrainerView = useCallback(async (v) => {
     setTrainerViewRaw(v);
-    setTab(0);
+    setTab(4);
     try {
       await db.update(user.accessToken, "profiles", `id=eq.${user.id}`, { trainer_view: v });
     } catch(e) { logErr("[TRAINER VIEW] save error:", e.message); }
