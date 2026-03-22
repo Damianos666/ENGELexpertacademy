@@ -208,8 +208,10 @@ function WeeklyQuizBanner({ token, userId, onConfirmed, devDateStr = null, onDev
           streak_last_date:   today,
           program_start_date: gd.program_start_date || today,
         }, "user_id");
+        setResult({ ...res, newPoints: (gd.points || 0) + (res.points || 0) });
+      } else {
+        setResult({ ...res, newPoints: res.points || 0 });
       }
-      setResult({ ...res, newPoints: (gd.points || 0) + (res.points || 0) });
       setQuizDone(true);
       if (isDevMode) {
         if (onDevQuizDone) onDevQuizDone();
