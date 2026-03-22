@@ -8,6 +8,13 @@ export const QUIZ_MESSAGES = {
     "Doskonały wynik! Jesteś ekspertem 🌟",
     "Perfekcja! Wiedza przemawia przez Ciebie 🚀",
     "Najlepszy wynik tygodnia — tak trzymaj! 🏆",
+    "Mistrzowski poziom! To już liga ekspertów 🎯",
+    "Wow! Ten wynik robi wrażenie 🔥",
+    "Pełna kontrola nad materiałem 💡",
+    "Jesteś w top 1%! Gratulacje 👑",
+    "Widać ogrom pracy — efekty są świetne 💪",
+    "Ten poziom to inspiracja dla innych 🚀",
+    "Perfekcyjnie opanowane — brawo!"
   ],
 
   // wynik >= 70%
@@ -15,6 +22,13 @@ export const QUIZ_MESSAGES = {
     "Świetna robota! Następnym razem może 90%?",
     "Bardzo dobrze! Widać że czytasz tipy uważnie 📖",
     "Solidny wynik — jesteś na dobrej drodze 💪",
+    "Coraz bliżej mistrzostwa 🔝",
+    "Dobra forma! Jeszcze trochę i będzie top 🚀",
+    "Stabilny progres — tak trzymaj 📈",
+    "Twoja wiedza rośnie z tygodnia na tydzień 🌱",
+    "To już poziom zaawansowany 👌",
+    "Mały krok do wielkiego wyniku 🏆",
+    "Widać systematyczność — działa!"
   ],
 
   // wynik >= 50%
@@ -22,6 +36,13 @@ export const QUIZ_MESSAGES = {
     "Dobry start! Czytaj tipy jeszcze uważniej 📖",
     "Nieźle! Powtórz materiał i następnym razem będzie lepiej",
     "50% to dobra baza — w górę od teraz! ⬆️",
+    "Jesteś na półmetku — teraz przyspiesz 💪",
+    "Potencjał jest — czas go wykorzystać 🔧",
+    "Jeszcze trochę pracy i wskoczysz wyżej 🚀",
+    "Każdy quiz przybliża Cię do celu 🎯",
+    "Zrób mały upgrade wiedzy i wróć silniejszy 🔄",
+    "Fundament już jest — buduj dalej 🧱",
+    "To dopiero początek — działaj dalej!"
   ],
 
   // wynik < 50%
@@ -29,6 +50,13 @@ export const QUIZ_MESSAGES = {
     "Powtórz tipy i spróbuj za tydzień 💪",
     "Każdy błąd to lekcja — wróć silniejszy za 7 dni!",
     "Nie poddawaj się — następny quiz będzie Twój! 🎯",
+    "To dopiero rozgrzewka — działaj dalej 🔥",
+    "Każdy ekspert kiedyś zaczynał 📚",
+    "Zrób reset i wróć z nową energią ⚡",
+    "Spróbuj jeszcze raz — progres przyjdzie 💡",
+    "Małe kroki też prowadzą do celu 🚶",
+    "Nie wynik, a kierunek ma znaczenie 🧭",
+    "Następny tydzień to Twoja szansa!"
   ],
 };
 
