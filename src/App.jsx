@@ -4,6 +4,7 @@ import { auth, db, session, setOnTokenRefreshed } from "./lib/supabase";
 import { calcProgress } from "./lib/helpers";
 import { log, err as logErr } from "./lib/logger";
 import { LangProvider } from "./lib/LangContext";
+import { useSafeArea } from "./lib/useSafeArea";
 import { ToastProvider, useToast } from "./lib/ToastContext";
 import { UserContext, useUser } from "./lib/UserContext";
 import { Header, Spinner } from "./components/SharedUI";
@@ -142,6 +143,9 @@ function AppRoot() {
 
   const lastMsgAt    = useRef(null);
   const pollInterval = useRef(null);
+
+  // Odczytuje env(safe-area-inset-bottom) po renderze i ustawia --safe-bottom
+  useSafeArea();
 
   function requestNotifPermission() {
     if ("Notification" in window && Notification.permission === "default") {
