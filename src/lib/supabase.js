@@ -250,4 +250,8 @@ export const edge = {
 
   verifyCode: (token, code, special_title, special_days) =>
     edgeFetch(token, "verify-training-code", { code, special_title, special_days }),
+
+  // Zapis punktów za tip / quiz — serwer weryfikuje duplikaty i oblicza punkty
+  saveResult: (token, payload) =>
+    edgeFetch(token, "save-gamification-result", payload),
 };
