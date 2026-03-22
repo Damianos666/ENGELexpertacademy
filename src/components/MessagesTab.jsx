@@ -8,6 +8,7 @@ import { useUser } from "../lib/UserContext";
 import { getDailyTipFromCycle, getDailyTipQuestion, TIP_POINTS, calcNewStreak, isQuizDay, getWeekKey, getWeekQuestions, calcQuizPoints, getProgramInfo } from "../lib/gamification";
 import { WeeklyQuiz } from "./GramTab";
 import { QuizRewardModal } from "./QuizRewardModal";
+import { TipRewardModal } from "./TipRewardModal";
 
 const CONTACT_EMAIL = import.meta.env.VITE_CONTACT_EMAIL || "";
 const CONTACT_PHONE = import.meta.env.VITE_CONTACT_PHONE || "";
@@ -20,6 +21,7 @@ function TipBanner({ token, userId, onConfirmed, devDateStr = null, onDevSeen, c
   const [confirmed,  setConfirmed]  = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [loading,    setLoading]    = useState(true);
+  const [tipModal,   setTipModal]   = useState(null); // { totalPoints, streak }
 
   useEffect(() => {
     async function load() {
@@ -76,6 +78,7 @@ function TipBanner({ token, userId, onConfirmed, devDateStr = null, onDevSeen, c
           program_start_date: gd.program_start_date || today,
         }, "user_id");
         if (onConfirmed) onConfirmed();
+        setTipModal({ totalPoints: (gd.points || 0) + TIP_POINTS, streak: newStreak });
       } else {
         // Dev mode: tylko zaznacz jako widziany lokalnie
         if (onDevSeen) onDevSeen(today);
@@ -90,6 +93,15 @@ function TipBanner({ token, userId, onConfirmed, devDateStr = null, onDevSeen, c
 
   // Brak pytań lub brak tipu na dziś — nie pokazuj banera
   if (loading || !tipQ) return null;
+
+  // Modal po potwierdzeniu tipa (pokazuje się przed badge)
+  if (tipModal) return (
+    <TipRewardModal
+      totalPoints={tipModal.totalPoints}
+      streak={tipModal.streak}
+      onClose={() => setTipModal(null)}
+    />
+  );
 
   // Tip potwierdzony dziś — mały badge zamiast karty
   if (confirmed) return (
