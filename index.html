@@ -11,11 +11,37 @@
     <link rel="apple-touch-icon" href="/pwa-192.png" />
     <link rel="icon" type="image/png" href="/logo.png" />
     <title>ENGEL expert academy</title>
+
+    <!--
+      iOS PWA SAFE AREA FIX — MUSI BYĆ PIERWSZYM SKRYPTEM W <head>.
+
+      Problem: env(safe-area-inset-bottom) w CSS zwraca 0px przy pierwszym
+      renderze iOS standalone PWA — iOS oblicza tę wartość asynchronicznie.
+      Fallback w env(value, 34px) NIE pomaga bo iOS *obsługuje* env(), tylko
+      zwraca 0. Dlatego wszystkie podejścia przez CSS env() zawodziły.
+
+      Rozwiązanie: synchronicznie (przed jakimkolwiek renderem) wykrywamy
+      iOS standalone PWA + home indicator i ustawiamy --safe-bottom jako
+      CSS variable. Reszta CSS używa var(--safe-bottom) — nigdy env().
+    -->
+    <script>
+      (function() {
+        var isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+        var isStandalone = window.navigator.standalone === true;
+        // iPhone z home indicator: screen.height >= 780 (iPhone X, 12, 13, 14, 15 itd.)
+        // iPhone bez home indicator: screen.height <= 667 (SE, 6, 7, 8)
+        // Próg 750 bezpieczny — żaden iPhone bez home indicator nie przekracza 667px
+        var hasHomeIndicator = isIOS && isStandalone && window.screen.height >= 750;
+        var safeBottom = hasHomeIndicator ? 34 : 0;
+        document.documentElement.style.setProperty('--safe-bottom', safeBottom + 'px');
+      })();
+    </script>
+
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
 
       html, body {
-        background: #EFEFEF;
+        background: #ffffff;
         overscroll-behavior: none;
         overflow: hidden;
       }
@@ -98,7 +124,6 @@
         .admin-top-tabs {
           display: none !important;
         }
-        #safe-area-bottom { display: none; }
       }
 
       @media (max-width: 1024px) {
@@ -123,40 +148,24 @@
           overflow: hidden;
         }
         .app-content { -webkit-overflow-scrolling: touch; }
+
+        /* Tabbar — padding przez --safe-bottom, NIE przez env() */
         .tabbar {
           position: fixed !important;
           bottom: 0; left: 0; right: 0;
-          padding-bottom: env(safe-area-inset-bottom, 34px); /* iOS PWA fix: fallback 34px gdy env() jeszcze nie obliczone */
+          padding-bottom: var(--safe-bottom, 0px);
           z-index: 100;
+          background: #ffffff;
         }
         .contact-fab {
           position: fixed !important;
-          bottom: calc(68px + env(safe-area-inset-bottom, 0px)) !important;
+          bottom: calc(68px + var(--safe-bottom, 0px)) !important;
           right: 16px !important;
-        }
-        /*
-          iOS PWA FIX: env(safe-area-inset-bottom) wynosi 0px przy pierwszym renderze CSS.
-          Browser przelicza te wartosci dopiero po chwili, co powoduje szary pasek
-          (kolor body: #EFEFEF) widoczny pod tabbarem zaraz po uruchomieniu.
-
-          Rozwiazanie: staly bialy div przykrywa dolna strefe home indicator od razu,
-          z fallbackiem 34px (typowa wysokosc home indicator na iPhone z Face ID).
-          z-index: 98 — pod tabbarem (100), wiec tabbar go przykrywa gdy sam
-          ma juz poprawny padding-bottom z env().
-        */
-        #safe-area-bottom {
-          position: fixed;
-          bottom: 0; left: 0; right: 0;
-          height: env(safe-area-inset-bottom, 34px);
-          background: #ffffff;
-          z-index: 98;
-          pointer-events: none;
         }
       }
     </style>
   </head>
   <body>
-    <div id="safe-area-bottom"></div>
     <div id="root"></div>
     <script>
       function getOrientationAngle() {
@@ -192,6 +201,26 @@
           h = window.innerHeight;
         }
 
+        // iOS standalone PWA: przy pierwszym załadowaniu visualViewport.height
+        // może zawierać strefę home indicator (34px). Odejmujemy ją żeby
+        // --app-height wskazywał tylko na użytkową część ekranu.
+        // Po rotacji i kolejnych wywołaniach visualViewport zwraca już
+        // poprawną wartość — odejmowanie duplikowałoby redukcję, dlatego
+        // sprawdzamy czy h > screen.height - 50 (czyli czy h jest "za duże").
+        var safeBottom = parseInt(
+          document.documentElement.style.getPropertyValue('--safe-bottom') || '0'
+        );
+        if (safeBottom > 0) {
+          var screenH = isLandscape
+            ? Math.min(window.screen.width, window.screen.height)
+            : Math.max(window.screen.width, window.screen.height);
+          // Jeśli h jest bliskie pełnej wysokości ekranu (różnica < 60px),
+          // znaczy że visualViewport jeszcze nie odjął strefy home indicator.
+          if (h > screenH - 60) {
+            h = h - safeBottom;
+          }
+        }
+
         document.documentElement.style.setProperty('--app-width',  w + 'px');
         document.documentElement.style.setProperty('--app-height', h + 'px');
 
@@ -207,12 +236,8 @@
       setTimeout(setAppSize, 50);
       setTimeout(setAppSize, 200);
       setTimeout(setAppSize, 500);
-      // iOS PWA: env(safe-area-inset-bottom) moze byc gotowe dopiero po ~1s
-      // od uruchomienia aplikacji w trybie standalone
       setTimeout(setAppSize, 1000);
-      setTimeout(setAppSize, 1800);
 
-      // Eksponujemy globalnie — App.jsx uzywa po pierwszym renderze React
       window._eaSetAppSize = setAppSize;
 
       if (window.visualViewport) {
