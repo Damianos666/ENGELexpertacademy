@@ -96,7 +96,7 @@ const styles = {
   appContent:     { flex: 1, minHeight: 0, position: "relative", overflow: "hidden" },
   tabVisible:     { display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" },
   tabHidden:      { display: "none",  flexDirection: "column", height: "100%", overflow: "hidden" },
-  trainerContent: { flex: 1, minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch", display: "flex", flexDirection: "column", paddingBottom: "calc(60px + env(safe-area-inset-bottom, 34px))" },
+  trainerContent: { flex: 1, minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch", display: "flex", flexDirection: "column", paddingBottom: "calc(60px + var(--safe-bottom, 0px))" },
   tabBar:         { display: "flex", background: C.white, borderTop: `1px solid ${C.grey}`, flexShrink: 0 },
   suspenseFallback: { height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: C.greyBg },
 };
@@ -142,15 +142,6 @@ function AppRoot() {
 
   const lastMsgAt    = useRef(null);
   const pollInterval = useRef(null);
-
-  // iOS PWA: wymuś przeliczenie --app-height i env(safe-area-inset-bottom)
-  // po pierwszym renderze React — to eliminuje szary pasek przy starcie
-  useEffect(() => {
-    const raf = requestAnimationFrame(() => {
-      if (window._eaSetAppSize) window._eaSetAppSize();
-    });
-    return () => cancelAnimationFrame(raf);
-  }, []);
 
   function requestNotifPermission() {
     if ("Notification" in window && Notification.permission === "default") {
@@ -556,7 +547,7 @@ function ClientView({ tab, setTab, completed, activeGroups, setActiveGroups, onL
 }
 
 /* ─── TABBAR TRENERA ─────────────────────────────────────────────────────── */
-const tabBtnBase = { flex: 1, background: "none", border: "none", padding: "4px 2px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, cursor: "pointer", position: "relative" };
+const tabBtnBase = { flex: 1, background: "none", border: "none", padding: "8px 2px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, cursor: "pointer", position: "relative" };
 
 function TrainerTabBar({ tab, setTab, msgCount }) {
   return (
