@@ -556,7 +556,7 @@ function ClientView({ tab, setTab, completed, activeGroups, setActiveGroups, onL
 }
 
 /* ─── TABBAR TRENERA ─────────────────────────────────────────────────────── */
-const tabBtnBase = { flex: 1, background: "none", border: "none", padding: "8px 2px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, cursor: "pointer", position: "relative" };
+const tabBtnBase = { flex: 1, background: "none", border: "none", padding: "4px 2px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, cursor: "pointer", position: "relative" };
 
 function TrainerTabBar({ tab, setTab, msgCount }) {
   return (
