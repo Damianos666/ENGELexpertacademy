@@ -610,9 +610,9 @@ export function MessagesTab({ onTipConfirmed }) {
     setResetting(true);
     try {
       await Promise.all([
-        db.remove(token, "tip_confirmations",   `user_id=eq.${user.id}`).catch(() => {}),
-        db.remove(token, "quiz_weekly_results", `user_id=eq.${user.id}`).catch(() => {}),
-        db.remove(token, "user_gamification",   `user_id=eq.${user.id}`).catch(() => {}),
+        db.remove(token, "tip_confirmations",   `user_id=eq.${user.id}`),
+        db.remove(token, "quiz_weekly_results", `user_id=eq.${user.id}`),
+        db.remove(token, "user_gamification",   `user_id=eq.${user.id}`),
       ]);
       setDevSeenDates(new Set());
       setDevQuizDone(false);
