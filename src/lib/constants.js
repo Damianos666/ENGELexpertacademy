@@ -25,8 +25,8 @@ export const MSG_TYPES = {
 // BEZPIECZEŃSTWO: Panel Dewelopera widoczny tylko gdy VITE_DEV_PANEL=true w .env.local
 // W produkcji zmienna nie jest ustawiona → false → Vite wycina cały kod z bundle'a (tree-shaking)
 // Lokalnie: dodaj VITE_DEV_PANEL=true do .env.local żeby panel działał
-//export const DEV_PANEL_ENABLED = import.meta.env.VITE_DEV_PANEL === "true";
-export const DEV_PANEL_ENABLED = true;
+export const DEV_PANEL_ENABLED = import.meta.env.VITE_DEV_PANEL === "true";
+//export const DEV_PANEL_ENABLED = true;
 
 export const TRAINERS = {
   1: "Sylwester Klimek",
