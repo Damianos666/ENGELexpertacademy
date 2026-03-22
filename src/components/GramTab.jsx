@@ -7,7 +7,6 @@ import {
   PROG_LEVELS, getLevelInfo, getEarnedBadges,
   calcQuizPoints, QUIZ_DURATION,
 } from "../lib/gamification";
-import { QuizRewardModal } from "./QuizRewardModal";
 
 /* ─── Pomocniki ──────────────────────────────────────────────────────────── */
 const toISO = (d = new Date()) => d.toISOString().slice(0, 10);
@@ -72,13 +71,9 @@ export function WeeklyQuiz({ questions, onResult }) {
 if (phase === "result") {
   const correct = questions.filter(q => answers[q.id] === q.correct).length;
   const { pct, points, basePoints, timeBonus } = calcQuizPoints(correct, questions.length, timeLeft);
-  return (
-    <QuizRewardModal
-      result={{ pct, points, basePoints, timeBonus, correct, total: questions.length }}
-      totalPoints={points}
-      onClose={() => onResult({ pct, points, basePoints, timeBonus, correct, total: questions.length })}
-    />
-  );
+  // Przekaż wynik do rodzica (WeeklyQuizBanner) — modal pokazuje się tam
+  onResult({ pct, points, basePoints, timeBonus, correct, total: questions.length });
+  return null;
 }
 
   if (!currentQ) return null;
