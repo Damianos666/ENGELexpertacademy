@@ -1,11 +1,11 @@
 import { useState, useEffect, memo } from "react";
 import { C, MSG_TYPES, DEV_PANEL_ENABLED } from "../lib/constants";
-import { db } from "../lib/supabase";
+import { db, edge } from "../lib/supabase";
 import { formatDate } from "../lib/helpers";
 import { Spinner, Toggle } from "./SharedUI";
 import { useT } from "../lib/LangContext";
 import { useUser } from "../lib/UserContext";
-import { getDailyTipFromCycle, getDailyTipQuestion, TIP_POINTS, calcNewStreak, isQuizDay, getWeekKey, getWeekQuestions, calcQuizPoints, getProgramInfo } from "../lib/gamification";
+import { getDailyTipFromCycle, getDailyTipQuestion, TIP_POINTS, isQuizDay, getWeekKey, getWeekQuestions, getProgramInfo } from "../lib/gamification";
 import { WeeklyQuiz } from "./GramTab";
 import { QuizRewardModal } from "./QuizRewardModal";
 import { TipRewardModal } from "./TipRewardModal";
@@ -61,24 +61,13 @@ function TipBanner({ token, userId, onConfirmed, devDateStr = null, onDevSeen, c
     try {
       // W trybie symulacji tylko lokalnie oznaczamy jako potwierdzone — bez zapisu do bazy
       if (!isDevMode) {
-        await db.insert(token, "tip_confirmations", {
-          user_id:        userId,
-          tip_date:       today,
-          question_id:    tipQ.id,
-          points_awarded: TIP_POINTS,
+        const res = await edge.saveResult(token, {
+          action:     "tip",
+          today,
+          questionId: tipQ.id,
         });
-        const gameRows = await db.get(token, "user_gamification", `user_id=eq.${userId}&select=*`).catch(() => []);
-        const gd = gameRows[0] || { points: 0, streak_current: 0, streak_last_date: null };
-        const newStreak = calcNewStreak(gd.streak_current, gd.streak_last_date, today);
-        await db.upsert(token, "user_gamification", {
-          user_id:            userId,
-          points:             (gd.points || 0) + TIP_POINTS,
-          streak_current:     newStreak,
-          streak_last_date:   today,
-          program_start_date: gd.program_start_date || today,
-        }, "user_id");
         if (onConfirmed) onConfirmed();
-        setTipModal({ totalPoints: (gd.points || 0) + TIP_POINTS, streak: newStreak });
+        setTipModal({ totalPoints: res.total_points, streak: res.streak });
       } else {
         // Dev mode: tylko zaznacz jako widziany lokalnie
         if (onDevSeen) onDevSeen(today);
@@ -209,18 +198,17 @@ function WeeklyQuizBanner({ token, userId, onConfirmed, devDateStr = null, onDev
       }
       // W trybie symulacji nie dodajemy punktów do prawdziwego konta
       if (!isDevMode) {
-        const gameRows = await db.get(token, "user_gamification", `user_id=eq.${userId}&select=*`).catch(() => []);
-        const gd = gameRows[0] || { points: 0, streak_current: 0, streak_last_date: null };
-        // Quiz tygodniowy podtrzymuje streak — bez aktualizacji streak się zeruje na D1 kolejnego cyklu
-        const newStreak = calcNewStreak(gd.streak_current, gd.streak_last_date, today);
-        await db.upsert(token, "user_gamification", {
-          user_id:            userId,
-          points:             (gd.points || 0) + (res.points || 0),
-          streak_current:     newStreak,
-          streak_last_date:   today,
-          program_start_date: gd.program_start_date || today,
-        }, "user_id");
-        setResult({ ...res, newPoints: (gd.points || 0) + (res.points || 0) });
+        const { week, year } = getWeekKey();
+        const serverRes = await edge.saveResult(token, {
+          action:       "quiz",
+          today,
+          correctCount: res.correct,
+          totalCount:   res.total,
+          timeBonus:    res.timeBonus,
+          weekYear:     year,
+          weekNumber:   week,
+        });
+        setResult({ ...res, newPoints: serverRes.total_points });
       } else {
         setResult({ ...res, newPoints: res.points || 0 });
       }
