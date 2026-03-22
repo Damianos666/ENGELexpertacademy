@@ -12,14 +12,9 @@
     <link rel="icon" type="image/png" href="/logo.png" />
     <title>ENGEL expert academy</title>
 
-    <!-- Synchronicznie ustawia --safe-bottom zanim CSS sie wyrenderuje -->
+    <!-- --safe-bottom startuje od 0; React hook useSafeArea() ustawi realną wartość po renderze -->
     <script>
-      (function() {
-        var isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
-        var isStandalone = window.navigator.standalone === true;
-        var hasHomeIndicator = isIOS && isStandalone && window.screen.height >= 750;
-        document.documentElement.style.setProperty('--safe-bottom', hasHomeIndicator ? '20px' : '0px');
-      })();
+      document.documentElement.style.setProperty('--safe-bottom', '0px');
     </script>
 
     <style>
