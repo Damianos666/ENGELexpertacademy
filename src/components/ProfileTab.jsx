@@ -13,9 +13,9 @@ export function ProfileTab({ completed, activeGroups, setActiveGroups, onLogout,
   const { user, setUser } = useUser();
   const T = useT();
   const { lang, switchLang } = useLang();
-  const [editName,  setEditName]  = useState(user.displayName);
-  const [editRole,  setEditRole]  = useState(user.displayRole || "");
-  const [editFirma, setEditFirma] = useState(user.firma || "");
+  const [editName,       setEditName]       = useState(user.displayName);
+  const [editStanowisko, setEditStanowisko] = useState(user.stanowisko || "");
+  const [editFirma,      setEditFirma]      = useState(user.firma || "");
   const [editing,   setEditing]   = useState(false);
   const [saving,    setSaving]    = useState(false);
   const [saved,     setSaved]     = useState(false);
@@ -24,20 +24,20 @@ export function ProfileTab({ completed, activeGroups, setActiveGroups, onLogout,
   const progress = calcProgress(completed, activeGroups);
 
   async function saveProfile() {
-    const name  = editName.trim()  || user.name;
-    const role  = editRole.trim()  || null;
-    const firma = editFirma.trim() || null;
+    const name       = editName.trim()       || user.name;
+    const stanowisko = editStanowisko.trim() || null;
+    const firma      = editFirma.trim()      || null;
     setSaving(true); setSaveErr("");
     try {
-      log("[SAVE PROFILE] updating user id:", user.id, { name, role, firma });
-      const res = await db.update(user.accessToken, "profiles", `id=eq.${user.id}`, { name, role, firma });
+      log("[SAVE PROFILE] updating user id:", user.id, { name, stanowisko, firma });
+      const res = await db.update(user.accessToken, "profiles", `id=eq.${user.id}`, { name, stanowisko, firma });
       log("[SAVE PROFILE] result:", res);
       if (!res || res.length === 0) {
         warn("[SAVE PROFILE] OSTRZEŻENIE: update zwrócił pustą tablicę — prawdopodobnie RLS blokuje UPDATE na tabeli users");
         setSaveErr(T.no_permission);
         return;
       }
-      setUser(p => ({...p, displayName:name, displayRole:role||"", firma:firma||"", name, role}));
+      setUser(p => ({...p, displayName:name, displayRole:stanowisko||"", stanowisko, firma:firma||"", name}));
       setEditing(false); setSaved(true); setTimeout(() => setSaved(false), 2500);
     } catch(e) {
       logErr("[SAVE PROFILE] ERROR:", e.message);
@@ -57,7 +57,7 @@ export function ProfileTab({ completed, activeGroups, setActiveGroups, onLogout,
   }
 
   const initials = user.displayName.split(" ").map(n => n[0]).join("").slice(0,2).toUpperCase();
-  const subtitle = [user.displayRole, user.firma].filter(Boolean).join(" · ");
+  const subtitle = [user.stanowisko, user.firma].filter(Boolean).join(" · ");
 
   return (
     <>
@@ -78,7 +78,7 @@ export function ProfileTab({ completed, activeGroups, setActiveGroups, onLogout,
       {editing && (
         <div style={{background:C.white,margin:"8px 12px 0",padding:20,boxShadow:"0 1px 3px rgba(0,0,0,.08)",borderTop:`3px solid ${C.green}`}}>
           <div style={{fontSize:11,fontWeight:700,letterSpacing:1,color:C.greyDk,marginBottom:16,textTransform:"uppercase"}}>Edytuj dane</div>
-          {[[T.full_name,editName,setEditName,T.example_name],[T.position,editRole,setEditRole,T.optional],[T.company,editFirma,setEditFirma,T.optional]].map(([lbl,val,set,ph]) => (
+          {[[T.full_name,editName,setEditName,T.example_name],[T.position,editStanowisko,setEditStanowisko,T.optional],[T.company,editFirma,setEditFirma,T.optional]].map(([lbl,val,set,ph]) => (
             <div key={lbl} style={{marginBottom:16}}>
               <label style={{display:"block",fontSize:11,fontWeight:700,color:C.greyDk,marginBottom:6,letterSpacing:.5}}>{lbl}</label>
               <input style={{width:"100%",border:"none",borderBottom:`2px solid ${C.green}`,padding:"9px 0",fontSize:15,color:C.black,outline:"none",boxSizing:"border-box"}}
@@ -89,7 +89,7 @@ export function ProfileTab({ completed, activeGroups, setActiveGroups, onLogout,
           <div style={{fontSize:11,color:C.greyMid,marginBottom:16}}>Widoczne w aplikacji i na certyfikatach. E-mail pozostaje bez zmian.</div>
           <div style={{display:"flex",gap:8}}>
             <button style={{flex:1,background:saving?C.greyDk:C.black,border:"none",color:C.white,padding:12,fontSize:13,fontWeight:600,cursor:saving?"not-allowed":"pointer"}} onClick={saveProfile} disabled={saving}>{saving?T.saving:T.save}</button>
-            <button style={{flex:1,background:"none",border:`1px solid ${C.grey}`,color:C.greyDk,padding:12,fontSize:13,fontWeight:600,cursor:"pointer"}} onClick={() => { setEditing(false); setEditName(user.displayName); setEditRole(user.displayRole||""); setEditFirma(user.firma||""); setSaveErr(""); }}>Anuluj</button>
+            <button style={{flex:1,background:"none",border:`1px solid ${C.grey}`,color:C.greyDk,padding:12,fontSize:13,fontWeight:600,cursor:"pointer"}} onClick={() => { setEditing(false); setEditName(user.displayName); setEditStanowisko(user.stanowisko||""); setEditFirma(user.firma||""); setSaveErr(""); }}>Anuluj</button>
           </div>
         </div>
       )}
