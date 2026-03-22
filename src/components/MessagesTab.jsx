@@ -334,7 +334,7 @@ function DevPanel({ token, userId, onDevDate, seenDates, devQuizDone, onReset, o
     ? getProgramInfo(programStart, simDateStr)
     : { cycleNumber: 0, dayInCycle: 0 };
   const isQuiz  = dayInCycle === 6;
-  const cycleQs = simDateStr ? getWeekQuestions(allQuestions, programStart, simDateStr) : [];
+  const cycleQs = simDateStr ? getWeekQuestions(allQuestions, programStart, simDateStr).filter(Boolean) : [];
   const todayTip = (!isQuiz && cycleQs.length > 0) ? cycleQs[dayInCycle] : null;
 
   // Oblicz seenDays (Set<index 0-5>) z seenDates (Set<ISO string>) dla bieżącego cyklu
