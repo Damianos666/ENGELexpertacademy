@@ -97,7 +97,7 @@ const styles = {
   tabVisible:     { display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" },
   tabHidden:      { display: "none",  flexDirection: "column", height: "100%", overflow: "hidden" },
   trainerContent: { flex: 1, minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch", display: "flex", flexDirection: "column" },
-  tabBar:         { display: "flex", background: C.white, borderTop: `1px solid ${C.grey}`, flexShrink: 0 },
+  tabBar:         { display: "flex", background: C.white, borderTop: `1px solid ${C.grey}`, flexShrink: 0, paddingBottom: "env(safe-area-inset-bottom, 0px)" },
   suspenseFallback: { height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: C.greyBg },
 };
 
@@ -143,6 +143,15 @@ function AppRoot() {
   const lastMsgAt    = useRef(null);
   const pollInterval = useRef(null);
 
+  // iOS PWA: wymuś przeliczenie --app-height i env(safe-area-inset-bottom)
+  // po pierwszym renderze React — to eliminuje szary pasek przy starcie
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => {
+      if (window._eaSetAppSize) window._eaSetAppSize();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
   function requestNotifPermission() {
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
@@ -185,7 +194,7 @@ function AppRoot() {
 
   const setTrainerView = useCallback(async (v) => {
     setTrainerViewRaw(v);
-    setTab(4);
+    setTab(4); // Jawnie pozostań na Profilu — index 4 w obu widokach (trainer i client)
     try {
       await db.update(user.accessToken, "profiles", `id=eq.${user.id}`, { trainer_view: v });
     } catch(e) { logErr("[TRAINER VIEW] save error:", e.message); }
