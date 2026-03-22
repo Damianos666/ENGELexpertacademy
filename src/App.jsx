@@ -96,8 +96,8 @@ const styles = {
   appContent:     { flex: 1, minHeight: 0, position: "relative", overflow: "hidden" },
   tabVisible:     { display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" },
   tabHidden:      { display: "none",  flexDirection: "column", height: "100%", overflow: "hidden" },
-  trainerContent: { flex: 1, minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch", display: "flex", flexDirection: "column" },
-  tabBar:         { display: "flex", background: C.white, borderTop: `1px solid ${C.grey}`, flexShrink: 0, paddingBottom: "env(safe-area-inset-bottom, 0px)" },
+  trainerContent: { flex: 1, minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch", display: "flex", flexDirection: "column", paddingBottom: "calc(60px + env(safe-area-inset-bottom, 34px))" },
+  tabBar:         { display: "flex", background: C.white, borderTop: `1px solid ${C.grey}`, flexShrink: 0 },
   suspenseFallback: { height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: C.greyBg },
 };
 
@@ -560,7 +560,7 @@ const tabBtnBase = { flex: 1, background: "none", border: "none", padding: "8px 
 
 function TrainerTabBar({ tab, setTab, msgCount }) {
   return (
-    <div style={styles.tabBar}>
+    <div className="tabbar" style={styles.tabBar}>
       {TRAINER_TABS.map(([label, icon], i) => (
         <button key={i} onClick={() => setTab(i)}
           style={{ ...tabBtnBase, borderTop: `3px solid ${tab === i ? C.green : "transparent"}` }}>
