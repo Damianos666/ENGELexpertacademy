@@ -250,8 +250,21 @@ export const edge = {
 
   verifyCode: (token, code, special_title, special_days) =>
     edgeFetch(token, "verify-training-code", { code, special_title, special_days }),
+};
 
-  // Zapis punktów za tip / quiz — serwer weryfikuje duplikaty i oblicza punkty
-  saveResult: (token, payload) =>
-    edgeFetch(token, "save-gamification-result", payload),
+/* ─── RPC ────────────────────────────────────────────────────────────────── */
+// Wywołuje Postgres funkcję save_gamification_result przez PostgREST.
+// Bezpieczniejsze niż Edge Function — auth.uid() ustawiany server-side przez PostgREST,
+// klient nie może podrobić user_id. Zero cold startów.
+export const rpc = {
+  saveResult: async (token, params) => {
+    const r = await fetchWithTimeout(`${SB_URL}/rest/v1/rpc/save_gamification_result`, {
+      method: "POST",
+      headers: { ...authHeaders(token), "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d?.message || d?.hint || "Błąd zapisu wyniku");
+    return d;
+  },
 };
