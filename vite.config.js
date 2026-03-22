@@ -22,8 +22,8 @@ export default defineConfig(({ mode }) => {
         registerType: 'autoUpdate',
         includeAssets: ['logo.png', 'pwa-192.png', 'pwa-512.png'],
         manifest: {
-          name: 'ENGEL expert academy',
-          short_name: 'ENGEL EA',
+          name: 'ENGEL Expert Academy',
+          short_name: 'ENGEL Expert Academy',
           description: 'Aplikacja szkoleń ENGEL Expert Academy',
           theme_color: '#2C2C2C',
           background_color: '#EFEFEF',
