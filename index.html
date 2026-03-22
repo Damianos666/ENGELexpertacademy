@@ -98,6 +98,7 @@
         .admin-top-tabs {
           display: none !important;
         }
+        #safe-area-bottom { display: none; }
       }
 
       @media (max-width: 1024px) {
@@ -125,7 +126,7 @@
         .tabbar {
           position: fixed !important;
           bottom: 0; left: 0; right: 0;
-          padding-bottom: env(safe-area-inset-bottom, 0px);
+          padding-bottom: env(safe-area-inset-bottom, 34px); /* iOS PWA fix: fallback 34px gdy env() jeszcze nie obliczone */
           z-index: 100;
         }
         .contact-fab {
@@ -133,10 +134,29 @@
           bottom: calc(68px + env(safe-area-inset-bottom, 0px)) !important;
           right: 16px !important;
         }
+        /*
+          iOS PWA FIX: env(safe-area-inset-bottom) wynosi 0px przy pierwszym renderze CSS.
+          Browser przelicza te wartosci dopiero po chwili, co powoduje szary pasek
+          (kolor body: #EFEFEF) widoczny pod tabbarem zaraz po uruchomieniu.
+
+          Rozwiazanie: staly bialy div przykrywa dolna strefe home indicator od razu,
+          z fallbackiem 34px (typowa wysokosc home indicator na iPhone z Face ID).
+          z-index: 98 — pod tabbarem (100), wiec tabbar go przykrywa gdy sam
+          ma juz poprawny padding-bottom z env().
+        */
+        #safe-area-bottom {
+          position: fixed;
+          bottom: 0; left: 0; right: 0;
+          height: env(safe-area-inset-bottom, 34px);
+          background: #ffffff;
+          z-index: 98;
+          pointer-events: none;
+        }
       }
     </style>
   </head>
   <body>
+    <div id="safe-area-bottom"></div>
     <div id="root"></div>
     <script>
       function getOrientationAngle() {
@@ -187,6 +207,13 @@
       setTimeout(setAppSize, 50);
       setTimeout(setAppSize, 200);
       setTimeout(setAppSize, 500);
+      // iOS PWA: env(safe-area-inset-bottom) moze byc gotowe dopiero po ~1s
+      // od uruchomienia aplikacji w trybie standalone
+      setTimeout(setAppSize, 1000);
+      setTimeout(setAppSize, 1800);
+
+      // Eksponujemy globalnie — App.jsx uzywa po pierwszym renderze React
+      window._eaSetAppSize = setAppSize;
 
       if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', setAppSize);
